@@ -1,7 +1,7 @@
 #include "main.h"
 
 __global__
-void histo(const unsigned int* const vals, //INPUT
+void histo(const char* const vals, //INPUT
                unsigned int* const histo,      //OUPUT
                int numVals)
 {
@@ -22,7 +22,7 @@ void histo(const unsigned int* const vals, //INPUT
   atomicAdd(&histo[threadIdx.x], s_histo[threadIdx.x]);
 }
 
-void computeHistogram(const unsigned int* const d_vals, //INPUT
+void computeHistogram(const char* const d_vals, //INPUT
                       unsigned int* const d_histo,      //OUTPUT
                       const unsigned int numBins,
                       const unsigned int numElems)

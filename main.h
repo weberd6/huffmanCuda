@@ -18,7 +18,7 @@ void check(T err, const char* const func, const char* const file, const int line
   }
 }
 
-void computeHistogram(const unsigned int* const d_vals, //INPUT
+void computeHistogram(const char* const d_vals, //INPUT
                       unsigned int* const d_histo,      //OUTPUT
                       const unsigned int numBins,
                       const unsigned int numElems);
