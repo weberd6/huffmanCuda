@@ -18,13 +18,16 @@ void parallel_huffman(char* data, unsigned int num_bytes) {
 	char* d_vals;
 	unsigned int* d_histo;
 	unsigned int* d_min_vals;
+	unsigned int* d_min_indices;
 
 	unsigned int* h_histo = (unsigned int*)malloc(256*sizeof(unsigned int));
 	unsigned int* h_min_vals = (unsigned int*)malloc(2*sizeof(unsigned int));
-	
+	unsigned int* h_min_indices = (unsigned int*)malloc(2*sizeof(unsigned int));	
+
 	cudaMalloc(&d_vals, num_bytes*sizeof(unsigned char));
 	cudaMalloc(&d_histo, 256*sizeof(unsigned int));
 	cudaMalloc(&d_min_vals, 2*sizeof(unsigned int));
+	cudaMalloc(&d_min_indices, 2*sizeof(unsigned int));
 
 	cudaMemcpy(d_vals, data, num_bytes*sizeof(unsigned char), cudaMemcpyHostToDevice);
 
@@ -40,16 +43,18 @@ void parallel_huffman(char* data, unsigned int num_bytes) {
 		huffman_nodes[i].set_value(h_histo[i]);
 	}
 
-	// TODO turn this into a loop
-	get_minimum2(d_histo, numVals, d_min_vals);
-	cudaMemcpy(h_min_vals, d_min_vals, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	unsigned int count = numVals;
+	while (count > 1)
+	{
+		get_minimum2(d_histo, numVals, d_min_vals);
+		cudaMemcpy(h_min_vals, d_min_vals, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-	update_histo_and_get_min_indices();
-	// TODO
-	int index1 = 0;
-	int index2 = 0;
+		update_histo_and_get_min_indices(d_histo, h_min_vals[0], h_min_vals[1], d_min_indices, numVals);
+		cudaMemcpy(h_min_indices, d_min_indices, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-	Node* new_node = new Node(&huffman_nodes[index1], &huffman_nodes[index2], h_min_vals[0] + h_min_vals[1]);
+		Node* new_node = new Node(&huffman_nodes[h_min_indices[0]], &huffman_nodes[h_min_indices[1]], h_min_vals[0] + h_min_vals[1]);
+		count--;
+	}
 
 }
 

@@ -39,8 +39,11 @@ inline unsigned long upper_power_of_two(unsigned long v)
     return v;
 }
 
-void update_histo_and_get_min_indices();
-
+void update_histo_and_get_min_indices(unsigned int* d_in,
+				unsigned int val1,
+				unsigned int val2,
+				unsigned int* d_indices,
+				const size_t numElems);
 
 #endif 
 
