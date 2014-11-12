@@ -1,3 +1,6 @@
+#ifndef __NODE_H__
+#define __NODE_H__
+
 class Node {
 	private:
 		Node* left_child;
@@ -14,3 +17,6 @@ class Node {
 		void set_right_child(Node* right_child);		
 		void set_value(int value);
 };
+
+#endif
+

@@ -16,14 +16,20 @@ GCC_OPTS=-O3 -m64
 
 NAME=huffman
 
-$(NAME): main.o histo.o Makefile
-	$(NVCC) -o $(NAME) main.o histo.o -L $(NVCC_OPTS)
+$(NAME): main.o histo.o min2.o node.o Makefile
+	$(NVCC) -o $(NAME) main.o histo.o min2.o node.o -L $(NVCC_OPTS)
 
-main.o: main.cu main.h
+main.o: main.cu main.h node.h
 	$(NVCC) -c main.cu  -l $(CUDA_LIBPATH) -I $(CUDA_INCLUDEPATH) $(NVCC_OPTS)
 
-histo.o: histo.cu
+histo.o: histo.cu main.h
 	$(NVCC) -c histo.cu $(NVCC_OPTS)
+
+min2.o: min2.cu main.h
+	$(NVCC) -c min2.cu $(NVCC_OPTS)
+
+node.o: node.cpp node.h
+	$(CC) -c node.cpp $(GCC_OPTS)
 
 clean:
 	rm -f *.o $(NAME)

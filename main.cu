@@ -1,4 +1,5 @@
 #include "main.h"
+#include "node.h"
 
 #include <ctime>
 #include <string>
@@ -16,13 +17,40 @@ long getFileSize(std::string filename)
 void parallel_huffman(char* data, unsigned int num_bytes) {
 	char* d_vals;
 	unsigned int* d_histo;
+	unsigned int* d_min_vals;
 
+	unsigned int* h_histo = (unsigned int*)malloc(256*sizeof(unsigned int));
+	unsigned int* h_min_vals = (unsigned int*)malloc(2*sizeof(unsigned int));
+	
 	cudaMalloc(&d_vals, num_bytes*sizeof(unsigned char));
 	cudaMalloc(&d_histo, 256*sizeof(unsigned int));
+	cudaMalloc(&d_min_vals, 2*sizeof(unsigned int));
 
 	cudaMemcpy(d_vals, data, num_bytes*sizeof(unsigned char), cudaMemcpyHostToDevice);
 
 	computeHistogram(d_vals, d_histo, 256, num_bytes);
+	cudaMemcpy(h_histo, d_histo, 256*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+
+	size_t numVals = 256;
+
+	// TODO get rid of histo bins with 0 count
+
+	Node* huffman_nodes = new Node[numVals];
+	for (int i = 0; i < numVals; i++) {
+		huffman_nodes[i].set_value(h_histo[i]);
+	}
+
+	// TODO turn this into a loop
+	get_minimum2(d_histo, numVals, d_min_vals);
+	cudaMemcpy(h_min_vals, d_min_vals, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+
+	update_histo_and_get_min_indices();
+	// TODO
+	int index1 = 0;
+	int index2 = 0;
+
+	Node* new_node = new Node(&huffman_nodes[index1], &huffman_nodes[index2], h_min_vals[0] + h_min_vals[1]);
+
 }
 
 int main (int argc, char** argv) {
