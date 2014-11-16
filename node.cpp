@@ -4,10 +4,10 @@
 Node::Node() {
 	this->left_child = NULL;
 	this->right_child = NULL;
-	this->value = -1;
+	this->value = NULL;
 }
 
-Node::Node(Node* left_child, Node* right_child, int value) {
+Node::Node(Node* left_child, Node* right_child, char* value) {
 	this->left_child = left_child;
 	this->right_child = right_child;
 	this->value = value;
@@ -29,10 +29,10 @@ void Node::set_right_child(Node* right_child) {
 	this->right_child = right_child;
 }
 
-int Node::get_value() {
+char* Node::get_value() {
 	return this->value;
 }
 
-void Node::set_value(int value) {
+void Node::set_value(char value[]) {
 	this->value = value;
 }
