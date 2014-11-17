@@ -1,15 +1,15 @@
+#include <queue>
+#include <stdlib.h>
 #include "node.h"
 #include "node.cpp"
 
-void allocate_huffman_node(Node p);
-void create_priority_queue(Node leaf[], int q[]);
 
 // GenerateCode
 // Input:  root - the root of a 2-tree
 // Output: Code[0:n-1] - array of binary strings, where Code[i] is the code for the symbol ai
 void generate_code(Node *root, int code[]) {
 	if (!root->get_left_child())
-		; // code[root.symbolIndex()] = root.binaryCode();
+		code[root->symbol_index] = atoi(root->get_value());
 	else
 	{
 		Node *left = root->get_left_child();
@@ -22,13 +22,18 @@ void generate_code(Node *root, int code[]) {
 }
 
 
+void create_priority_queue(Node leaf[], std::priority_queue<int, std::vector<int>, std::greater<int> > q) {
+
+}
+
+
 // HuffmanCode
 // Input:  Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
 void huffman_code(int a[], int freq[], int code[]) {
 	int n = sizeof(&a);
 	Node leaf[1];
-	Node q[1];
+	std::priority_queue<int, std::vector<int>, std::greater<int> > q;
 	Node *l;
 	Node *r;
 	Node *root;
@@ -42,26 +47,24 @@ void huffman_code(int a[], int freq[], int code[]) {
 		leaf[i] = *p;
 	}
 
-
-	// std::priority_queue<int, std::vector<int>, std::greater<int> > q;
-	// create_priority_queue(leaf, q);
-
-
+	create_priority_queue(leaf, q);
 
 	for (int i=1; i<n; i++)
 	{
 		// remove smallest and second smallest frequencies from the queue
+		Node *l = q.pop();
+		Node *r = q.pop();
 
-		// remove_priority_queue(q, l);
-		// remove_priority_queue(q, r);
-
-		// create a new root node;
+		// create a new subtree
 		root = new Node();
-
 		root->set_left_child(l);
 		root->set_right_child(r);
+
+		// the frequency of the root is the sum of the children's frequencies
 		root->frequency = (l->frequency) + (r->frequency);
-		// insert_priority_queue(q, root);
+
+		// insert the subtree into the heap
+		q.push(root);
 	}
 
 	root->set_value(NULL);
