@@ -7,10 +7,11 @@ Node::Node() {
 	this->value = NULL;
 }
 
-Node::Node(Node* left_child, Node* right_child, char* value) {
+Node::Node(Node* left_child, Node* right_child, unsigned int frequency) {
 	this->left_child = left_child;
 	this->right_child = right_child;
-	this->value = value;
+	this->value = NULL;
+	this->frequency = frequency;
 }
 
 Node* Node::get_left_child() {

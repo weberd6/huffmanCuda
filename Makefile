@@ -16,8 +16,8 @@ GCC_OPTS=-O3 -m64
 
 NAME=huffman
 
-$(NAME): main.o histo.o min2.o node.o Makefile
-	$(NVCC) -o $(NAME) main.o histo.o min2.o node.o -L $(NVCC_OPTS)
+$(NAME): main.o histo.o min2.o node.o serial.o Makefile
+	$(NVCC) -o $(NAME) main.o histo.o min2.o node.o serial.o -L $(NVCC_OPTS)
 
 main.o: main.cu main.h node.h
 	$(NVCC) -c main.cu  -l $(CUDA_LIBPATH) -I $(CUDA_INCLUDEPATH) $(NVCC_OPTS)
@@ -30,6 +30,9 @@ min2.o: min2.cu main.h
 
 node.o: node.cpp node.h
 	$(CC) -c node.cpp $(GCC_OPTS)
+
+serial.o: serial.cpp
+	$(CC) -c serial.cpp $(GCC_OPTS)
 
 clean:
 	rm -f *.o $(NAME)

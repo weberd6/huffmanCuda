@@ -6,6 +6,7 @@
 #include <cstring>
 #include <sys/stat.h>
 #include <fstream>
+#include <cassert>
 
 long getFileSize(std::string filename)
 {
@@ -14,48 +15,82 @@ long getFileSize(std::string filename)
     return rc == 0 ? stat_buf.st_size : -1;
 }
 
-void parallel_huffman(char* data, unsigned int num_bytes) {
-	char* d_vals;
-	unsigned int* d_histo;
-	unsigned int* d_min_vals;
+void print_frequencies(unsigned int* freq, const size_t size)
+{
+	for (unsigned int i = 0; i < size; i++)
+		std::cout << freq[i] << std::endl;
+}
+
+void parallel_huffman(char* data, unsigned int num_bytes)
+{
+	const unsigned int NUM_VALS = 256;
+
+	unsigned char* d_vals;
+	unsigned int* d_frequencies;
+	unsigned int* d_min_frequencies;
 	unsigned int* d_min_indices;
 
-	unsigned int* h_histo = (unsigned int*)malloc(256*sizeof(unsigned int));
-	unsigned int* h_min_vals = (unsigned int*)malloc(2*sizeof(unsigned int));
+	unsigned int* h_frequencies = (unsigned int*)malloc(NUM_VALS*sizeof(unsigned int));
+	unsigned int* h_min_frequencies = (unsigned int*)malloc(2*sizeof(unsigned int));
 	unsigned int* h_min_indices = (unsigned int*)malloc(2*sizeof(unsigned int));	
 
 	cudaMalloc(&d_vals, num_bytes*sizeof(unsigned char));
-	cudaMalloc(&d_histo, 256*sizeof(unsigned int));
-	cudaMalloc(&d_min_vals, 2*sizeof(unsigned int));
+	cudaMalloc(&d_frequencies, NUM_VALS*sizeof(unsigned int));
+	cudaMalloc(&d_min_frequencies, 2*sizeof(unsigned int));
 	cudaMalloc(&d_min_indices, 2*sizeof(unsigned int));
 
 	cudaMemcpy(d_vals, data, num_bytes*sizeof(unsigned char), cudaMemcpyHostToDevice);
 
-	computeHistogram(d_vals, d_histo, 256, num_bytes);
-	cudaMemcpy(h_histo, d_histo, 256*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	computeHistogram(d_vals, d_frequencies, NUM_VALS, num_bytes);
 
-	size_t numVals = 256;
+	unsigned int count = NUM_VALS;
+	unsigned int* d_count;
+	cudaMalloc(&d_count, sizeof(unsigned int));
+	cudaMemcpy(d_count, &count, sizeof(count), cudaMemcpyHostToDevice);
+	minimizeBins(d_frequencies, d_count, NUM_VALS);
+	cudaMemcpy(&count, d_count, sizeof(count), cudaMemcpyDeviceToHost);
 
-	// TODO get rid of histo bins with 0 count
+	cudaMemcpy(h_frequencies, d_frequencies, NUM_VALS*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-	Node* huffman_nodes = new Node[numVals];
-	for (int i = 0; i < numVals; i++) {
-		huffman_nodes[i].set_value(h_histo[i]);
+	unsigned int sum = 0;
+	Node leaf_nodes[NUM_VALS];
+	Node* node_by_index[NUM_VALS];
+
+	for (int i = 0; i < NUM_VALS; i++) {
+		if (h_frequencies[i] != 0xFFFFFFFF) sum += h_frequencies[i];
+		leaf_nodes[i].frequency = h_frequencies[i];
+		node_by_index[i] = &leaf_nodes[i];
 	}
 
-	unsigned int count = numVals;
+	Node* root;
+	Node* l;
+	Node* r;
 	while (count > 1)
 	{
-		get_minimum2(d_histo, numVals, d_min_vals);
-		cudaMemcpy(h_min_vals, d_min_vals, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+		get_minimum2(d_frequencies, NUM_VALS, d_min_frequencies);
+		cudaMemcpy(h_min_frequencies, d_min_frequencies, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-		update_histo_and_get_min_indices(d_histo, h_min_vals[0], h_min_vals[1], d_min_indices, numVals);
+		std::cout << "Mins: " << h_min_frequencies[0] << " " << h_min_frequencies[1] << std::endl;
+
+		update_histo_and_get_min_indices(d_frequencies, h_min_frequencies[0], h_min_frequencies[1], d_min_indices, NUM_VALS);
 		cudaMemcpy(h_min_indices, d_min_indices, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-		Node* new_node = new Node(&huffman_nodes[h_min_indices[0]], &huffman_nodes[h_min_indices[1]], h_min_vals[0] + h_min_vals[1]);
+		l = node_by_index[h_min_indices[0]];
+		r = node_by_index[h_min_indices[1]];
+		std::cout << "Nodes: " << l->frequency << " " << r->frequency << std::endl;
+
+		root = new Node(l, r, l->frequency + r->frequency);
+		node_by_index[h_min_indices[1]] = root;
+
 		count--;
 	}
 
+	std::cout << "\nSize of file: " << num_bytes << " bytes" << std::endl;
+	std::cout << "Sum of frequencies: " << sum << std::endl;
+	std::cout << "Root huffman frequency: " <<  root->frequency << std::endl;
+
+	std::cout << "Root left child: " << root->get_left_child()->frequency << std::endl;
+	std::cout << "Root right child: " << root->get_right_child()->frequency << std::endl;
 }
 
 int main (int argc, char** argv) {
@@ -94,6 +129,10 @@ int main (int argc, char** argv) {
 	long num_bytes = getFileSize(input_filename);
 	char* data = new char[num_bytes];
 	std::ifstream ifs(input_filename.c_str());
+	if(!ifs) {
+		std::cout << "Failed to open file: " << input_filename << std::endl;
+	}
+
 	ifs.read(data, num_bytes);
 
 	std::clock_t start = std::clock();

@@ -1,8 +1,7 @@
 #include <queue>
+#include <vector>
 #include <stdlib.h>
 #include "node.h"
-#include "node.cpp"
-
 
 // GenerateCode
 // Input:  root - the root of a 2-tree
@@ -22,18 +21,13 @@ void generate_code(Node *root, int code[]) {
 }
 
 
-void create_priority_queue(Node leaf[], std::priority_queue<int, std::vector<int>, std::greater<int> > q) {
-
-}
-
-
 // HuffmanCode
 // Input:  Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
 void huffman_code(int a[], int freq[], int code[]) {
 	int n = sizeof(&a);
 	Node leaf[1];
-	std::priority_queue<int, std::vector<int>, std::greater<int> > q;
+	std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
 	Node *l;
 	Node *r;
 	Node *root;
@@ -47,13 +41,14 @@ void huffman_code(int a[], int freq[], int code[]) {
 		leaf[i] = *p;
 	}
 
-	create_priority_queue(leaf, q);
-
 	for (int i=1; i<n; i++)
 	{
 		// remove smallest and second smallest frequencies from the queue
-		Node *l = q.pop();
-		Node *r = q.pop();
+		Node *l = q.top();
+		q.pop();
+
+		Node *r = q.top();
+		q.pop();
 
 		// create a new subtree
 		root = new Node();
