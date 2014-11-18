@@ -75,6 +75,8 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 		update_histo_and_get_min_indices(d_frequencies, h_min_frequencies[0], h_min_frequencies[1], d_min_indices, NUM_VALS);
 		cudaMemcpy(h_min_indices, d_min_indices, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
+        assert(h_min_indices[0] != h_min_indices[1]);
+
 		l = node_by_index[h_min_indices[0]];
 		r = node_by_index[h_min_indices[1]];
 		std::cout << "Nodes: " << l->frequency << " " << r->frequency << std::endl;
