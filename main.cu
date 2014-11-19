@@ -6,7 +6,6 @@
 #include <cstring>
 #include <sys/stat.h>
 #include <fstream>
-#include <cassert>
 
 long getFileSize(std::string filename)
 {
@@ -109,7 +108,7 @@ int main (int argc, char** argv) {
 					exit(1);
 				}
 				else {
-					run_parallel = argv[i];
+					run_parallel = atoi(argv[i]);
 					i++;
 				}
 			}
