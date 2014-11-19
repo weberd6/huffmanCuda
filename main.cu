@@ -70,16 +70,14 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 		get_minimum2(d_frequencies, NUM_VALS, d_min_frequencies);
 		cudaMemcpy(h_min_frequencies, d_min_frequencies, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-		std::cout << "Mins: " << h_min_frequencies[0] << " " << h_min_frequencies[1] << std::endl;
+//		std::cout << "Mins: " << h_min_frequencies[0] << " " << h_min_frequencies[1] << std::endl;
 
 		update_histo_and_get_min_indices(d_frequencies, h_min_frequencies[0], h_min_frequencies[1], d_min_indices, NUM_VALS);
 		cudaMemcpy(h_min_indices, d_min_indices, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-        assert(h_min_indices[0] != h_min_indices[1]);
-
 		l = node_by_index[h_min_indices[0]];
 		r = node_by_index[h_min_indices[1]];
-		std::cout << "Nodes: " << l->frequency << " " << r->frequency << std::endl;
+//		std::cout << "Nodes: " << l->frequency << " " << r->frequency << std::endl;
 
 		root = new Node(l, r, l->frequency + r->frequency);
 		node_by_index[h_min_indices[1]] = root;
@@ -87,12 +85,9 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 		count--;
 	}
 
-	std::cout << "\nSize of file: " << num_bytes << " bytes" << std::endl;
-	std::cout << "Sum of frequencies: " << sum << std::endl;
-	std::cout << "Root huffman frequency: " <<  root->frequency << std::endl;
-
-	std::cout << "Root left child: " << root->get_left_child()->frequency << std::endl;
-	std::cout << "Root right child: " << root->get_right_child()->frequency << std::endl;
+//	std::cout << "\nSize of file: " << num_bytes << " bytes" << std::endl;
+//	std::cout << "Sum of frequencies: " << sum << std::endl;
+//	std::cout << "Root huffman frequency: " <<  root->frequency << std::endl;
 }
 
 int main (int argc, char** argv) {
