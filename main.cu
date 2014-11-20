@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <fstream>
 
+void generate_code(Node *root, unsigned int code[], unsigned int length[]);
+
 long getFileSize(std::string filename)
 {
     struct stat stat_buf;
@@ -58,6 +60,7 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 	for (int i = 0; i < NUM_VALS; i++) {
 		if (h_frequencies[i] != 0xFFFFFFFF) sum += h_frequencies[i];
 		leaf_nodes[i].frequency = h_frequencies[i];
+		leaf_nodes[i].symbol_index = i;
 		node_by_index[i] = &leaf_nodes[i];
 	}
 
@@ -83,10 +86,22 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 
 		count--;
 	}
-
+	
 //	std::cout << "\nSize of file: " << num_bytes << " bytes" << std::endl;
 //	std::cout << "Sum of frequencies: " << sum << std::endl;
 //	std::cout << "Root huffman frequency: " <<  root->frequency << std::endl;
+
+	unsigned int codes[NUM_VALS];
+	unsigned int lengths[NUM_VALS];
+
+	memset(codes, 0, NUM_VALS*sizeof(unsigned int));
+	memset(lengths, 0, NUM_VALS*sizeof(unsigned int));
+
+	generate_code(root, codes, lengths);
+
+	for (unsigned int i = 0; i < NUM_VALS; i++) {
+		std::cout << i << ": " << codes[i] << "\t\t" << lengths[i] << std::endl;
+	}
 }
 
 int main (int argc, char** argv) {

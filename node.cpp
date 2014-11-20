@@ -4,14 +4,16 @@
 Node::Node() {
 	this->left_child = NULL;
 	this->right_child = NULL;
-	this->value = NULL;
+	this->value = 0;
+	this->length = 0;
 }
 
 Node::Node(Node* left_child, Node* right_child, unsigned int frequency) {
 	this->left_child = left_child;
 	this->right_child = right_child;
-	this->value = NULL;
+	this->value = 0;
 	this->frequency = frequency;
+	this->length = 0;
 }
 
 Node* Node::get_left_child() {
@@ -30,10 +32,10 @@ void Node::set_right_child(Node* right_child) {
 	this->right_child = right_child;
 }
 
-char* Node::get_value() {
+unsigned int Node::get_value() {
 	return this->value;
 }
 
-void Node::set_value(char value[]) {
+void Node::set_value(unsigned int value) {
 	this->value = value;
 }
