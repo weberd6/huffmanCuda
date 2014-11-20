@@ -99,9 +99,50 @@ void parallel_huffman(char* data, unsigned int num_bytes)
 
 	generate_code(root, codes, lengths);
 
-	for (unsigned int i = 0; i < NUM_VALS; i++) {
-		std::cout << i << ": " << codes[i] << "\t\t" << lengths[i] << std::endl;
-	}
+//	for (unsigned int i = 0; i < NUM_VALS; i++) {
+//		std::cout << i << ": " << codes[i] << "\t\t" << lengths[i] << std::endl;
+//	}
+
+	unsigned int* d_codes;
+	unsigned int* d_lengths;
+	unsigned int* d_data_lengths;
+	unsigned int* d_lengths_partial_sums;
+	unsigned char* d_encoded_data;
+	cudaMalloc(&d_codes, NUM_VALS*sizeof(unsigned int));
+	cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
+	cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
+	cudaMalloc(&d_lengths_partial_sums, num_bytes*sizeof(unsigned int));
+	cudaMalloc(&d_encoded_data, num_bytes*sizeof(unsigned char));
+
+	cudaMemcpy(d_codes, codes, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
+
+	compress_data(d_vals, d_codes, d_lengths, d_data_lengths, d_lengths_partial_sums, d_encoded_data, num_bytes);
+
+	unsigned int* h_data_lengths = (unsigned int*)malloc(num_bytes*sizeof(unsigned int));
+	unsigned int* h_lengths_partial_sums = (unsigned int*)malloc(num_bytes*sizeof(unsigned int));
+	cudaMemcpy(h_lengths_partial_sums, d_lengths_partial_sums, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(h_data_lengths, d_data_lengths, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+//	for (unsigned int i = 0; i < 1024; i++) {
+//		std::cout << i << ": " << h_lengths_partial_sums[i] << std::endl;
+//	}
+
+	free(h_frequencies);
+        free(h_min_frequencies);
+        free(h_min_indices);
+	free(h_data_lengths);
+	free(h_lengths_partial_sums);
+
+        cudaFree(d_vals);
+        cudaFree(d_frequencies);
+        cudaFree(d_min_frequencies);
+        cudaFree(d_min_indices);
+	cudaFree(d_count);
+	cudaFree(d_codes);
+        cudaFree(d_lengths);
+        cudaFree(d_data_lengths);
+        cudaFree(d_lengths_partial_sums);
+        cudaFree(d_encoded_data);
 }
 
 int main (int argc, char** argv) {

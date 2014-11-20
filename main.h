@@ -37,5 +37,13 @@ void minimizeBins(unsigned int* d_in,
 		unsigned int* d_count,
 		const size_t numElems);
 
+void compress_data(unsigned char* d_original_data,
+			unsigned int* d_codes,
+			unsigned int* d_lengths,
+			unsigned int* d_data_lengths,
+			unsigned int* d_lengths_partial_sums,
+			unsigned char* d_encoded_data,
+			const size_t num_bytes);
+
 #endif 
 

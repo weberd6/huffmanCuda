@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include "node.h"
 
-unsigned int mask[32] = {1, 3, 7, 15, 31, 63, 127, 255,
-			 511, 1023, 2047, 4095, 8191, 16383, 32767, 65535,
-			 131071, 262143, 524287, 1048575, 2097151, 4194303, 8388607, 16777215,
-			 33554431, 67108863, 134217727, 268435455, 536870911, 1073741823, 2147483647, 4294967295};
+unsigned int mask[32] = {0, 1, 3, 7, 15, 31, 63, 127,
+			 255, 511, 1023, 2047, 4095, 8191, 16383, 32767,
+			 65535, 131071, 262143, 524287, 1048575, 2097151, 4194303, 8388607,
+			 16777215, 33554431, 67108863, 134217727, 268435455, 536870911, 1073741823, 2147483647};
 
 
 // GenerateCode
@@ -22,7 +22,7 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
 		Node *left = root->get_left_child();
 		Node *right = root->get_right_child();
 		left->set_value(root->get_value());
-		right->set_value(root->get_value() | mask[root->length] | 1);
+		right->set_value(root->get_value() | (mask[root->length]+1) | 1);
 		left->length = root->length + 1;
 		right->length = root->length + 1;
 		generate_code(left, code, length);
