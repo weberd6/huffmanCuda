@@ -11,11 +11,11 @@
 
 template<typename T>
 void check(T err, const char* const func, const char* const file, const int line) {
-  if (err != cudaSuccess) {
-    std::cerr << "CUDA error at: " << file << ":" << line << std::endl;
-    std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
-    exit(1);
-  }
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA error at: " << file << ":" << line << std::endl;
+        std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
+        exit(1);
+    }
 }
 
 void computeHistogram(const unsigned char* const d_vals, //INPUT
@@ -24,26 +24,26 @@ void computeHistogram(const unsigned char* const d_vals, //INPUT
                       const unsigned int numElems);
 
 void get_minimum2(const unsigned int* d_in,
-		  const size_t numElems,
-		  unsigned int* d_vals);
+                  const size_t numElems,
+                  unsigned int* d_vals);
 
 void update_histo_and_get_min_indices(unsigned int* d_in,
-				unsigned int val1,
-				unsigned int val2,
-				unsigned int* d_indices,
-				const size_t numElems);
+                                      unsigned int val1,
+                                      unsigned int val2,
+                                      unsigned int* d_indices,
+                                      const size_t numElems);
 
 void minimizeBins(unsigned int* d_in,
-		unsigned int* d_count,
-		const size_t numElems);
+                  unsigned int* d_count,
+                  const size_t numElems);
 
 void compress_data(unsigned char* d_original_data,
-			unsigned int* d_codes,
-			unsigned int* d_lengths,
-			unsigned int* d_data_lengths,
-			unsigned int* d_lengths_partial_sums,
-			unsigned char* d_encoded_data,
-			const size_t num_bytes);
+                   unsigned int* d_codes,
+                   unsigned int* d_lengths,
+                   unsigned int* d_data_lengths,
+                   unsigned int* d_lengths_partial_sums,
+                   unsigned char* d_encoded_data,
+                   const size_t num_bytes);
 
-#endif 
+#endif
 
