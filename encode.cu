@@ -1,9 +1,34 @@
 #include "main.h"
 
+#define TO_BIG_ENDIAN(num) ((num >> 24) & 0xff) | ((num << 8) & 0xff0000) \
+                            | ((num >> 8) & 0xff00) | ((num << 24) & 0xff000000
+
 __global__
-void encode_data()
+void encode_data(unsigned char* d_original_data,
+                 unsigned int* d_codes,
+                 unsigned int* d_lengths,
+                 unsigned int* d_lengths_partial_sums,
+                 unsigned char* d_encoded_data,
+                 const size_t num_bytes)
 {
-  
+    const int DATA_BLOCK_SIZE = 8192;
+
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+
+    unsigned int byte_offset;
+    unsigned int bit_offset;
+    unsigned char symbol;
+
+    for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
+    {
+        byte_offset = d_lengths_partial_sums[id + i] / sizeof(char);
+        bit_offset = d_lengths_partial_sums[id + i] % sizeof(char);
+        symbol = d_original_data[id];
+
+        d_encoded_data[byte_offset] =
+            ((TO_BIG_ENDIAN(d_codes[symbol]) << (sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
+                | d_encoded_data[byte_offset];
+    }
 }
 
 __global__
@@ -188,8 +213,12 @@ void compress_data(unsigned char* d_original_data,
                    unsigned char* d_encoded_data,
                    const size_t num_bytes)
 {
-  int numBlocks = ceil(((float)num_bytes)/1024);
-  set_data_lengths<<<numBlocks, 1024>>>(d_lengths, d_original_data, d_data_lengths, num_bytes);
-  large_scan_sum(d_data_lengths, d_lengths_partial_sums, num_bytes);
+    int numBlocks = ceil(((float)num_bytes)/1024);
+    set_data_lengths<<<numBlocks, 1024>>>(d_lengths, d_original_data, d_data_lengths, num_bytes);
+    large_scan_sum(d_data_lengths, d_lengths_partial_sums, num_bytes);
+
+    int numBlocks2 = ceil(((float)compressed_length)/256);
+    encode_data<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_data_lengths,
+        d_lengths_partial_sums, d_encoded_data, num_bytes)
 }
 
