@@ -1,7 +1,7 @@
 #include "main.h"
 
 #define TO_BIG_ENDIAN(num) ((num >> 24) & 0xff) | ((num << 8) & 0xff0000) \
-                            | ((num >> 8) & 0xff00) | ((num << 24) & 0xff000000
+                            | ((num >> 8) & 0xff00) | ((num << 24) & 0xff000000)
 
 __global__
 void encode_data(unsigned char* d_original_data,
@@ -217,8 +217,17 @@ void compress_data(unsigned char* d_original_data,
     set_data_lengths<<<numBlocks, 1024>>>(d_lengths, d_original_data, d_data_lengths, num_bytes);
     large_scan_sum(d_data_lengths, d_lengths_partial_sums, num_bytes);
 
+    unsigned int* h_last_partial_sum = (unsigned int*)malloc(sizeof(unsigned int));
+    unsigned int* h_last_length = (unsigned int*)malloc(sizeof(unsigned int));
+    cudaMemcpy(h_last_partial_sum, &d_lengths_partial_sums[num_bytes-1], sizeof(unsigned int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_last_length, &d_data_lengths[num_bytes-1], sizeof(unsigned int), cudaMemcpyDeviceToHost);
+
+    int compressed_length = *h_last_partial_sum + *h_last_length;
+    cudaMalloc(&d_encoded_data, compressed_length*sizeof(unsigned char));
+
     int numBlocks2 = ceil(((float)compressed_length)/256);
-    encode_data<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_data_lengths,
-        d_lengths_partial_sums, d_encoded_data, num_bytes)
+    encode_data<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
+	d_encoded_data, num_bytes);
+
 }
 

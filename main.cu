@@ -112,8 +112,7 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
     cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
     cudaMalloc(&d_lengths_partial_sums, num_bytes*sizeof(unsigned int));
-    cudaMalloc(&d_encoded_data, num_bytes*sizeof(unsigned char));
-
+    
     cudaMemcpy(d_codes, codes, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
 
@@ -123,9 +122,14 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     unsigned int* h_lengths_partial_sums = (unsigned int*)malloc(num_bytes*sizeof(unsigned int));
     cudaMemcpy(h_lengths_partial_sums, d_lengths_partial_sums, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_data_lengths, d_data_lengths, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-//  for (unsigned int i = 0; i < 1024; i++) {
-//      std::cout << i << ": " << h_lengths_partial_sums[i] << std::endl;
-//  }
+    
+//    for (unsigned int i = 0; i < num_bytes; i++) {
+//        std::cout << i << ": " << h_data_lengths[i] << std::endl;
+//    }
+//    for (unsigned int i = 0; i < num_bytes; i++) {
+ //       std::cout << i << ": " << h_lengths_partial_sums[i] << std::endl;
+ //   }
+    std::cout << "Compressed size: " << (h_data_lengths[num_bytes-1] + h_lengths_partial_sums[num_bytes-1])/8 << " bytes" << std::endl;
 
     free(h_frequencies);
     free(h_min_frequencies);
