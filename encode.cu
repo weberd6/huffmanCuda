@@ -1,8 +1,5 @@
 #include "main.h"
 
-#define TO_BIG_ENDIAN(num) ((num >> 24) & 0xff) | ((num << 8) & 0xff0000) \
-                            | ((num >> 8) & 0xff00) | ((num << 24) & 0xff000000)
-
 __global__
 void encode_data(unsigned char* d_original_data,
                  unsigned int* d_codes,
