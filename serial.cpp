@@ -23,7 +23,7 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
         Node *left = root->get_left_child();
         Node *right = root->get_right_child();
         left->set_value(root->get_value());
-        right->set_value(TO_BIG_ENDIAN(root->get_value()) | TO_BIG_ENDIAN((mask[root->length]+1)));
+        right->set_value(root->get_value() | (mask[root->length]+1));
         left->length = root->length + 1;
         right->length = root->length + 1;
         generate_code(left, code, length);

@@ -23,7 +23,7 @@ void encode_data(unsigned char* d_original_data,
         symbol = d_original_data[id];
 
         d_encoded_data[byte_offset] =
-            ((TO_BIG_ENDIAN(d_codes[symbol]) << (sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
+            ((d_codes[symbol] << (sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
                 | d_encoded_data[byte_offset];
     }
 }
