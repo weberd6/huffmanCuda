@@ -18,8 +18,8 @@ void encode_data(unsigned char* d_original_data,
 
     for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
     {
-        byte_offset = d_lengths_partial_sums[id + i] / sizeof(char);
-        bit_offset = d_lengths_partial_sums[id + i] % sizeof(char);
+        byte_offset = d_lengths_partial_sums[id + i] / (8*sizeof(char));
+        bit_offset = d_lengths_partial_sums[id + i] % (8*sizeof(char));
         symbol = d_original_data[id];
 
         d_encoded_data[byte_offset] =
