@@ -2,7 +2,10 @@
 #include <vector>
 #include <stdlib.h>
 #include "node.h"
-#include "main.h"
+
+#include <stdio.h>
+
+const int SIZE = 6;
 
 unsigned int mask[32] = {0, 1, 3, 7, 15, 31, 63, 127,
             255, 511, 1023, 2047, 4095, 8191, 16383, 32767,
@@ -38,21 +41,20 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
 //         Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
 void huffman_code(int a[], int freq[], unsigned int code[]) {
-    int n = sizeof(a) / sizeof(int);  // n is the alphabet size
-    Node forest[n];
+    int n = SIZE;  // n is the alphabet size
     std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
 
-    // initialize forest of leaf nodes
+    // init leaf nodes
     for (int i=0; i<n; i++)
     {
         Node *p = new Node();
         p->symbol_index = i;
         p->frequency = freq[i];
-        forest[i] = *p;
+        q.push(p);
     }
 
 
-    for (int i=1; i<n; i++)
+    while (q.size() > 1)
     {
         // remove smallest and second smallest frequencies from the queue
         Node *l = q.top();
@@ -62,18 +64,32 @@ void huffman_code(int a[], int freq[], unsigned int code[]) {
         q.pop();
 
         // create a new subtree with the smallest nodes
-        Node *root = new Node();
-        root->set_left_child(l);
-        root->set_right_child(r);
+        Node *subtree = new Node();
+        subtree->set_left_child(l);
+        subtree->set_right_child(r);
 
         // the new root's frequency is the sum of the children's frequencies
-        root->frequency = (l->frequency) + (r->frequency);
+        subtree->frequency = (l->frequency) + (r->frequency);
 
         // insert the subtree into the heap
-        q.push(root);
+        q.push(subtree);
     }
 
-    root->set_value(0);
+    Node *root = q.top();
 
-    generate_code(root, code);
+    unsigned int b[10];
+    generate_code(root, code, b);
+}
+
+
+int main() {
+  int a[6] = { 'a', 'b', 'c', 'd', 'e', 'f' };
+  int freq[6] = { 9, 8, 5, 3, 15, 2 };
+  unsigned int code[6] = { 0, 0, 0, 0, 0, 0 };
+  huffman_code(a, freq, code);
+
+  for (int i=0; i<SIZE; i++)
+    printf("char %c's code is %d\n", a[i], code[i]);
+
+  return 0;
 }
