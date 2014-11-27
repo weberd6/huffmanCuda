@@ -1,15 +1,12 @@
 #include "main.h"
 
 __global__
-void encode_data(unsigned char* d_original_data,
+void compress(unsigned char* d_original_data,
                  unsigned int* d_codes,
                  unsigned int* d_lengths,
                  unsigned int* d_lengths_partial_sums,
-                 unsigned char* d_encoded_data,
-                 const size_t num_bytes)
+                 unsigned char* d_encoded_data)
 {
-    const int DATA_BLOCK_SIZE = 8192;
-
     int id = blockIdx.x * blockDim.x + threadIdx.x;
 
     unsigned int byte_offset;
@@ -18,13 +15,14 @@ void encode_data(unsigned char* d_original_data,
 
     for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
     {
-        byte_offset = d_lengths_partial_sums[id + i] / (8*sizeof(char));
-        bit_offset = d_lengths_partial_sums[id + i] % (8*sizeof(char));
+        byte_offset = d_lengths_partial_sums[id + i] / (8*sizeof(unsigned char));
+        bit_offset = d_lengths_partial_sums[id + i] % (8*sizeof(unsigned char));
         symbol = d_original_data[id];
 
-        d_encoded_data[byte_offset] =
-            ((d_codes[symbol] << (sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
-                | d_encoded_data[byte_offset];
+        *((unsigned int*)&d_encoded_data[byte_offset]) =
+            ((d_codes[symbol] << (8*sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
+
+                | *((unsigned int*)&d_encoded_data[byte_offset]);
     }
 }
 
@@ -208,7 +206,8 @@ void compress_data(unsigned char* d_original_data,
                    unsigned int* d_data_lengths,
                    unsigned int* d_lengths_partial_sums,
                    unsigned char* d_encoded_data,
-                   const size_t num_bytes)
+                   const size_t num_bytes,
+		   size_t& compressed_num_bytes)
 {
     int numBlocks = ceil(((float)num_bytes)/1024);
     set_data_lengths<<<numBlocks, 1024>>>(d_lengths, d_original_data, d_data_lengths, num_bytes);
@@ -219,12 +218,12 @@ void compress_data(unsigned char* d_original_data,
     cudaMemcpy(h_last_partial_sum, &d_lengths_partial_sums[num_bytes-1], sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_last_length, &d_data_lengths[num_bytes-1], sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-    int compressed_length = *h_last_partial_sum + *h_last_length;
-    cudaMalloc(&d_encoded_data, compressed_length*sizeof(unsigned char));
+    compressed_num_bytes = ceil((*h_last_partial_sum + *h_last_length)/8.0);
+    cudaMalloc(&d_encoded_data, compressed_num_bytes*sizeof(unsigned char));
 
-    int numBlocks2 = ceil(((float)compressed_length)/256);
-    encode_data<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
-	d_encoded_data, num_bytes);
+    int numBlocks2 = ceil(((float)compressed_num_bytes)/256);
+    compress<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
+	d_encoded_data);
 
 }
 

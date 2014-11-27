@@ -9,6 +9,18 @@
 
 #define checkCudaErrors(val) check( (val), #val, __FILE__, __LINE__)
 
+const unsigned int DATA_BLOCK_SIZE = 8192;
+
+struct NodeArray {
+    NodeArray() {
+        left = -1;
+        right = -1;
+    }
+    unsigned int symbol_index;
+    int left;
+    int right;
+};
+
 template<typename T>
 void check(T err, const char* const func, const char* const file, const int line) {
     if (err != cudaSuccess) {
@@ -43,7 +55,8 @@ void compress_data(unsigned char* d_original_data,
                    unsigned int* d_data_lengths,
                    unsigned int* d_lengths_partial_sums,
                    unsigned char* d_encoded_data,
-                   const size_t num_bytes);
+                   const size_t num_bytes,
+                   size_t& compressd_num_bytes);
 
 #endif
 

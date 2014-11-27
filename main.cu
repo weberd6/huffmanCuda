@@ -22,7 +22,24 @@ void print_frequencies(unsigned int* freq, const size_t size)
         std::cout << freq[i] << std::endl;
 }
 
-void parallel_huffman(char* data, unsigned int num_bytes)
+void serialize_tree(Node* root, std::ofstream& ofs)
+{
+    if (root == NULL) {
+        unsigned char all_ones = 255;
+        ofs.write(reinterpret_cast<const char*>(&all_ones), sizeof(all_ones));
+        ofs.write(reinterpret_cast<const char*>(&all_ones), sizeof(all_ones));
+        ofs.write(reinterpret_cast<const char*>(&all_ones), sizeof(all_ones));
+        return;
+    }
+
+    unsigned char i = root->symbol_index;
+    ofs.write(reinterpret_cast<const char*>(&i), sizeof(i));
+
+    serialize_tree(root->get_left_child(), ofs);
+    serialize_tree(root->get_right_child(), ofs);
+}
+
+void parallel_huffman_encode(char* data, unsigned int num_bytes, std::string filename)
 {
     const unsigned int NUM_VALS = 256;
 
@@ -67,29 +84,21 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     Node* root;
     Node* l;
     Node* r;
-    while (count > 1)
-    {
+    while (count > 1) {
         get_minimum2(d_frequencies, NUM_VALS, d_min_frequencies);
         cudaMemcpy(h_min_frequencies, d_min_frequencies, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-
-//      std::cout << "Mins: " << h_min_frequencies[0] << " " << h_min_frequencies[1] << std::endl;
 
         update_histo_and_get_min_indices(d_frequencies, h_min_frequencies[0], h_min_frequencies[1], d_min_indices, NUM_VALS);
         cudaMemcpy(h_min_indices, d_min_indices, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
         l = node_by_index[h_min_indices[0]];
         r = node_by_index[h_min_indices[1]];
-//      std::cout << "Nodes: " << l->frequency << " " << r->frequency << std::endl;
 
         root = new Node(l, r, l->frequency + r->frequency);
         node_by_index[h_min_indices[1]] = root;
 
         count--;
     }
-
-//  std::cout << "\nSize of file: " << num_bytes << " bytes" << std::endl;
-//  std::cout << "Sum of frequencies: " << sum << std::endl;
-//  std::cout << "Root huffman frequency: " <<  root->frequency << std::endl;
 
     unsigned int codes[NUM_VALS];
     unsigned int lengths[NUM_VALS];
@@ -98,10 +107,6 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     memset(lengths, 0, NUM_VALS*sizeof(unsigned int));
 
     generate_code(root, codes, lengths);
-
-//  for (unsigned int i = 0; i < NUM_VALS; i++) {
-//      std::cout << i << ": " << codes[i] << "\t\t" << lengths[i] << std::endl;
-//  }
 
     unsigned int* d_codes;
     unsigned int* d_lengths;
@@ -116,26 +121,27 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     cudaMemcpy(d_codes, codes, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
 
-    compress_data(d_vals, d_codes, d_lengths, d_data_lengths, d_lengths_partial_sums, d_encoded_data, num_bytes);
+    size_t compressed_num_bytes;
+    compress_data(d_vals, d_codes, d_lengths, d_data_lengths, d_lengths_partial_sums, d_encoded_data, num_bytes, compressed_num_bytes);
 
-    unsigned int* h_data_lengths = (unsigned int*)malloc(num_bytes*sizeof(unsigned int));
-    unsigned int* h_lengths_partial_sums = (unsigned int*)malloc(num_bytes*sizeof(unsigned int));
-    cudaMemcpy(h_lengths_partial_sums, d_lengths_partial_sums, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_data_lengths, d_data_lengths, num_bytes*sizeof(unsigned int), cudaMemcpyDeviceToHost);
-    
-//    for (unsigned int i = 0; i < num_bytes; i++) {
-//        std::cout << i << ": " << h_data_lengths[i] << std::endl;
-//    }
-//    for (unsigned int i = 0; i < num_bytes; i++) {
- //       std::cout << i << ": " << h_lengths_partial_sums[i] << std::endl;
- //   }
-    std::cout << "Compressed size: " << (h_data_lengths[num_bytes-1] + h_lengths_partial_sums[num_bytes-1])/8 << " bytes" << std::endl;
+    unsigned char* h_encoded_data = (unsigned char*)malloc(compressed_num_bytes*sizeof(unsigned char));
+    cudaMemcpy(h_encoded_data, d_encoded_data, compressed_num_bytes*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+
+    int lastindex = filename.find_last_of(".");
+    std::string name = filename.substr(0, lastindex);
+    std::string output_filename(name+".huff");
+    std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+
+    serialize_tree(root, ofs);
+
+    //TODO save length partial sum for every 32 lengths for block offset used to decode
+
+    ofs.write(reinterpret_cast<const char*>(h_encoded_data), compressed_num_bytes);
 
     free(h_frequencies);
     free(h_min_frequencies);
     free(h_min_indices);
-    free(h_data_lengths);
-    free(h_lengths_partial_sums);
+    free(h_encoded_data);
 
     cudaFree(d_vals);
     cudaFree(d_frequencies);
@@ -149,9 +155,70 @@ void parallel_huffman(char* data, unsigned int num_bytes)
     cudaFree(d_encoded_data);
 }
 
-int main (int argc, char** argv) {
+void deserialize_tree(Node* &d_root, std::ifstream& ifs)
+{
+    char ch;
+    ifs.get(ch);
 
+    if (255 == ch) {
+        ifs.get(ch);
+        if (255 == ch) {
+            ifs.get(ch);
+            if (255 == ch) {
+                return;
+            }
+            else {
+                ifs.unget();
+                ifs.unget();
+            }
+            
+        } else {
+            ifs.unget();
+        }
+    }
+
+    Node* h_root = new Node;
+    h_root->symbol_index = ch;
+
+    deserialize_tree(h_root->get_left_child(), ifs);
+    deserialize_tree(h_root->get_right_child(), ifs);
+}
+
+void tree_to_array(NodeArray* nodes, unsigned int index, Node* root)
+{
+    if (root == NULL)
+        return;
+
+    nodes[index].symbol_index = root->symbol_index;
+    nodes[index].left = 2*index+1;
+    nodes[index].right = 2*index+2;
+
+    tree_to_array(nodes, 2*index+1, root->get_left_child());
+    tree_to_array(nodes, 2*index+2, root->get_right_child());
+}
+
+void paralell_huffman_decode(std::ifstream& ifs)
+{
+    Node* h_root;
+    deserialize_tree(h_root, ifs);
+
+    unsigned int max_length = 0; // TODO Max reduce to find maximum length which will give the depth of the tree
+    unsigned int array_size = 1 << (max_length+1);
+
+    NodeArray* nodes = new NodeArray[array_size];
+    std::memset(nodes, 0, array_size*sizeof(NodeArray));
+
+    tree_to_array(nodes, 0, h_root);
+
+    //TODO copy tree to device
+
+    //TODO call decode kernel
+}
+
+int main (int argc, char** argv)
+{
     bool run_parallel = true;
+    bool encode = true;
     std::string input_filename;
 
     if (1 == argc) {
@@ -182,20 +249,27 @@ int main (int argc, char** argv) {
         exit(1);
     }
 
-    long num_bytes = getFileSize(input_filename);
-    char* data = new char[num_bytes];
-    std::ifstream ifs(input_filename.c_str());
-    if(!ifs) {
-        std::cout << "Failed to open file: " << input_filename << std::endl;
-    }
-
-    ifs.read(data, num_bytes);
 
     std::clock_t start = std::clock();
     double duration;
 
-    if (run_parallel) {
-        parallel_huffman(data, num_bytes);
+    if (encode) {
+
+        long num_bytes = getFileSize(input_filename);
+        char* data = new char[num_bytes];
+        std::ifstream ifs(input_filename.c_str());
+        if(!ifs) {
+            std::cout << "Failed to open file: " << input_filename << std::endl;
+        }
+
+        ifs.read(data, num_bytes);
+
+        if (run_parallel) {
+            parallel_huffman_encode(data, num_bytes, input_filename);
+        } else {
+
+        }
+
     } else {
 
     }

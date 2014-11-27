@@ -4,13 +4,10 @@
 #include "node.h"
 #include "main.h"
 
-const int SIZE = 6;
-
 unsigned int mask[32] = {0, 1, 3, 7, 15, 31, 63, 127,
             255, 511, 1023, 2047, 4095, 8191, 16383, 32767,
             65535, 131071, 262143, 524287, 1048575, 2097151, 4194303, 8388607,
             16777215, 33554431, 67108863, 134217727, 268435455, 536870911, 1073741823, 2147483647};
-
 
 // GenerateCode - generates a binary prefix code for a 2-tree
 // Input:  root - the root of a 2-tree
@@ -39,8 +36,8 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
 // Input:  a[], representing an alphabet, where a[i] == ai,
 //         Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
-void huffman_code(int a[], int freq[], unsigned int code[]) {
-  int n = SIZE;  // n is the alphabet size
+void huffman_code(int a[], int freq[], unsigned int code[], unsigned int lengths[]) {
+  int n = sizeof(a);
   std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
 
   // init leaf nodes
@@ -76,5 +73,5 @@ void huffman_code(int a[], int freq[], unsigned int code[]) {
 
       Node *root = q.top();
 
-      generate_code(root, code, b);
+      generate_code(root, code, lengths);
 }

@@ -16,11 +16,11 @@ Node::Node(Node* left_child, Node* right_child, unsigned int frequency) {
     this->length = 0;
 }
 
-Node* Node::get_left_child() {
+Node*& Node::get_left_child() {
     return this->left_child;
 }
 
-Node* Node::get_right_child() {
+Node*& Node::get_right_child() {
     return this->right_child;
 }
 
