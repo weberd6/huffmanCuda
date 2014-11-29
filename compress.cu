@@ -200,15 +200,14 @@ void large_scan_sum(unsigned int* const d_in,
     checkCudaErrors(cudaFree(incr));
 }
 
-void compress_data(unsigned char* d_original_data,
-                   unsigned int* d_codes,
-                   unsigned int* d_lengths,
-                   unsigned int* d_data_lengths,
-                   unsigned int* d_lengths_partial_sums,
-                   unsigned char* d_encoded_data,
-                   const size_t num_bytes,
-		   size_t& compressed_num_bytes)
+size_t get_compressed_length(unsigned int* d_lengths,
+                                   unsigned char* d_original_data,
+                                   unsigned int* d_data_lengths,
+                                   unsigned int* d_lengths_partial_sums,
+                                   const size_t num_bytes)
 {
+    unsigned int compressed_num_bytes;
+
     int numBlocks = ceil(((float)num_bytes)/1024);
     set_data_lengths<<<numBlocks, 1024>>>(d_lengths, d_original_data, d_data_lengths, num_bytes);
     large_scan_sum(d_data_lengths, d_lengths_partial_sums, num_bytes);
@@ -219,10 +218,19 @@ void compress_data(unsigned char* d_original_data,
     cudaMemcpy(h_last_length, &d_data_lengths[num_bytes-1], sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
     compressed_num_bytes = ceil((*h_last_partial_sum + *h_last_length)/8.0);
-    cudaMalloc(&d_encoded_data, compressed_num_bytes*sizeof(unsigned char));
 
-    int numBlocks2 = ceil(((float)compressed_num_bytes)/256);
-    compress<<<numBlocks2, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
+    return compressed_num_bytes;
+}
+
+void compress_data(unsigned char* d_original_data,
+                   unsigned int* d_codes,
+                   unsigned int* d_lengths,
+                   unsigned int* d_lengths_partial_sums,
+                   unsigned char* d_encoded_data,
+		   size_t compressed_num_bytes)
+{
+    int numBlocks = ceil(((float)compressed_num_bytes)/256);
+    compress<<<numBlocks, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
 	d_encoded_data);
 
 }

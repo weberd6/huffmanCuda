@@ -1,5 +1,6 @@
-#include "node.h"
 #include <cstddef>
+
+#include "node.h"
 
 Node::Node() {
     this->left_child = NULL;

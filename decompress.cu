@@ -42,7 +42,7 @@ void decompress(unsigned char* d_compressed_data,
                 unsigned char* d_decoded_data,
                 const size_t num_bytes)
 {
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
+/*    int id = blockIdx.x * blockDim.x + threadIdx.x;
 
     unsigned int j = 0; // Root index
     unsigned int n = d_block_length[blockIdx.x]-1;
@@ -52,7 +52,7 @@ void decompress(unsigned char* d_compressed_data,
     for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
     {
         
-    }
+    }*/
 }
 
 

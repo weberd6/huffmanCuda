@@ -1,13 +1,12 @@
 #include <queue>
 #include <vector>
 #include <stdlib.h>
+#include <cmath>
+#include <fstream>
+#include <cstring>
+
 #include "node.h"
 #include "main.h"
-
-unsigned int mask[32] = {0, 1, 3, 7, 15, 31, 63, 127,
-            255, 511, 1023, 2047, 4095, 8191, 16383, 32767,
-            65535, 131071, 262143, 524287, 1048575, 2097151, 4194303, 8388607,
-            16777215, 33554431, 67108863, 134217727, 268435455, 536870911, 1073741823, 2147483647};
 
 // GenerateCode - generates a binary prefix code for a 2-tree
 // Input:  root - the root of a 2-tree
@@ -22,8 +21,8 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
     {
         Node *left = root->get_left_child();
         Node *right = root->get_right_child();
-        left->set_value(root->get_value());
-        right->set_value(root->get_value() | (mask[root->length]+1));
+        left->set_value(root->get_value() & ~(1 << (root->length)));
+        right->set_value(root->get_value() | (1 << (root->length)));
         left->length = root->length + 1;
         right->length = root->length + 1;
         generate_code(left, code, length);
@@ -36,22 +35,20 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
 // Input:  a[], representing an alphabet, where a[i] == ai,
 //         Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
-void huffman_code(int a[], int freq[], unsigned int code[], unsigned int lengths[]) {
-  int n = sizeof(a);
-  std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
+void huffman_code(Node* &root, unsigned char a[], unsigned int freq[], unsigned int code[], unsigned int lengths[], unsigned int numVals) {
+    std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
 
-  // init leaf nodes
-  for (int i=0; i<n; i++)
-    {
-      Node *p = new Node();
-      p->symbol_index = i;
-      p->frequency = freq[i];
-      q.push(p);
+    // init leaf nodes
+    for (int i = 0; i < numVals; i++) {
+        if (freq[i] != 0) {
+            Node *p = new Node();
+            p->symbol_index = i;
+            p->frequency = freq[i];
+            q.push(p);
+        }
     }
 
-
-    while (q.size() > 1)
-      {
+    while (q.size() > 1) {
         // remove smallest and second smallest frequencies from the queue
         Node *l = q.top();
         q.pop();
@@ -71,7 +68,142 @@ void huffman_code(int a[], int freq[], unsigned int code[], unsigned int lengths
         q.push(subtree);
       }
 
-      Node *root = q.top();
-
-      generate_code(root, code, lengths);
+    if (q.size() != 0) {
+        root = q.top();
+        generate_code(root, code, lengths);
+    }
 }
+
+void compress_data(unsigned char* original_data, unsigned char* compressed_data, unsigned int* lengths,
+                   unsigned int* codes, unsigned int num_bytes) {
+    unsigned int byte_offset = 0;
+    unsigned int bit_offset = 7;
+
+    const unsigned int BITS_PER_BYTE = 8;
+
+    for (int i = 0; i < num_bytes; i++)
+    {
+        unsigned int code = codes[original_data[i]];
+        for (unsigned int j = 0; j < lengths[original_data[i]]; j++) {
+            if ((code & (1 << j)) == (1 << j)) {
+                compressed_data[byte_offset] |= (1 << bit_offset); 
+            } else {
+                compressed_data[byte_offset] &= ~(1 << bit_offset);
+            }
+            bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
+            if (bit_offset == 7) byte_offset++;
+        } 
+    }
+}
+
+void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename)
+{
+    const unsigned int NUM_VALS = 256;
+    unsigned int frequencies[NUM_VALS];
+
+    std::memset(frequencies, 0, NUM_VALS*sizeof(unsigned int));
+
+    for (unsigned int i = 0; i < num_bytes; i++) {
+        frequencies[data[i]]++;
+    }
+
+    unsigned char* a = new unsigned char[NUM_VALS];
+    for (unsigned int i = 0; i < NUM_VALS; i++) {
+        a[i] = i;
+    }
+
+    unsigned int* lengths = new unsigned int[NUM_VALS];
+    unsigned int* codes = new unsigned int[NUM_VALS];
+    std::memset(lengths, 0, NUM_VALS*sizeof(unsigned int));
+    std::memset(codes, 0, NUM_VALS*sizeof(unsigned int));
+
+    Node* root;
+    huffman_code(root, a, frequencies, codes, lengths, NUM_VALS);
+
+    unsigned int* data_lengths = new unsigned int[num_bytes];
+    unsigned int* lengths_partial_sums = new unsigned int[num_bytes];
+    unsigned int compressed_length = 0;
+    for (unsigned int i = 0; i < num_bytes; i++) {
+        data_lengths[i] = lengths[data[i]];
+        compressed_length += data_lengths[i];
+    }
+
+    unsigned int spare_bits = compressed_length % 8;
+    compressed_length = std::ceil(compressed_length/8.0);
+
+    unsigned char* compressed_data = new unsigned char[compressed_length];
+    compress_data(data, compressed_data, lengths, codes, num_bytes);
+
+    int lastindex = filename.find_last_of(".");
+    std::string name = filename.substr(0, lastindex);
+    std::string output_filename(name+".sc");
+    std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+
+    serialize_tree(root, ofs);
+    ofs.write(reinterpret_cast<const char*>(&num_bytes), sizeof(num_bytes));
+    ofs.write(reinterpret_cast<const char*>(&compressed_length), sizeof(compressed_length));
+    ofs.write(reinterpret_cast<const char*>(compressed_data), compressed_length);
+
+    ofs.close();
+}
+
+void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
+                 unsigned char* decompressed_data, unsigned int decompressed_length, Node* root)
+{
+    const int BITS_PER_BYTE = 8;
+
+    unsigned int byte_offset = 0;
+    unsigned int bit_offset = 7;
+    bool go_right;
+
+    unsigned int decompressed_offset = 0;
+
+    Node* current = root;
+
+    while (decompressed_offset < decompressed_length) {
+        go_right = ((compressed_data[byte_offset] & (1 << (bit_offset))) == (1 << (bit_offset)));
+
+        if (go_right) {
+            current = current->get_right_child();
+        } else {
+            current = current->get_left_child();
+        }
+
+        if (!current->get_left_child() && !current->get_right_child()) {
+            decompressed_data[decompressed_offset++] = current->symbol_index;
+            current = root;
+        }
+
+	bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
+
+	if (bit_offset == 7) byte_offset++;
+    }
+}
+
+void serial_huffman_decode(std::ifstream& ifs, std::string filename)
+{
+    Node* root;
+    deserialize_tree(root, ifs);
+
+    unsigned int decompressed_length;
+    ifs.read(reinterpret_cast<char*>(&decompressed_length), sizeof(decompressed_length));
+ 
+    unsigned int compressed_length;
+    ifs.read(reinterpret_cast<char*>(&compressed_length), sizeof(compressed_length));
+
+    unsigned char* compressed_data = (unsigned char*)malloc(compressed_length*sizeof(unsigned char));
+    ifs.read(reinterpret_cast<char*>(compressed_data), compressed_length);
+
+    unsigned char* decompressed_data = (unsigned char*)malloc(decompressed_length*sizeof(unsigned char));
+    decode_data(compressed_data, compressed_length, decompressed_data, decompressed_length, root);
+
+    int lastindex = filename.find_last_of(".");
+    std::string name = filename.substr(0, lastindex);
+    std::string output_filename(name+".sd");
+    std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+
+    ofs.write(reinterpret_cast<const char*>(decompressed_data), decompressed_length);
+    ofs.close();
+}
+
+

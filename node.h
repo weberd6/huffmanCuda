@@ -17,8 +17,8 @@ class Node {
         void set_right_child(Node* right_child);
         void set_value(unsigned int value);
         unsigned int frequency;
-        int symbol_index;
-        int length;
+        unsigned char symbol_index;
+        unsigned int length;
 };
 
 struct NodeGreater {
