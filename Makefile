@@ -1,5 +1,5 @@
 CC=g++
-NVCC=/usr/local/cuda-5.0/bin/nvcc
+NVCC=/usr/bin/nvcc
 
 CUDA_INCLUDEPATH=/usr/local/cuda-5.0/include
 #CUDA_INCLUDEPATH=/usr/local/cuda/lib64/include
@@ -16,8 +16,10 @@ GCC_OPTS=-O3 -m64
 
 NAME=huffman
 
-$(NAME): main.o histo.o min2.o compress.o decompress.o node.o parallel.o serial.o serialize.o Makefile
-	$(NVCC) -o $(NAME) main.o histo.o min2.o compress.o decompress.o node.o parallel.o serial.o serialize.o -L $(NVCC_OPTS)
+$(NAME): main.o histo.o min2.o compress.o decompress.o node.o parallel.o serial.o bwt.o mtf.o\
+serialize.o Makefile
+	$(NVCC) -o $(NAME) main.o histo.o min2.o compress.o decompress.o node.o parallel.o \
+	serial.o bwt.o mtf.o serialize.o -L $(NVCC_OPTS)
 
 main.o: main.cu main.h node.h
 	$(NVCC) -c main.cu  -l $(CUDA_LIBPATH) -I $(CUDA_INCLUDEPATH) $(NVCC_OPTS)
@@ -42,6 +44,12 @@ parallel.o: parallel.cu main.h
 
 serial.o: serial.cpp main.h
 	$(CC) -c serial.cpp $(GCC_OPTS)
+
+bwt.o: bwt.cpp main.h
+	$(CC) -c bwt.cpp $(GCC_OPTS)
+
+mtf.o: mtf.cpp main.h
+	$(CC) -c mtf.cpp $(GCC_OPTS)
 
 serialize.o: serialize.cpp main.h
 	$(CC) -c serialize.cpp $(GCC_OPTS)
