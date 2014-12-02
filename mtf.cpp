@@ -30,7 +30,7 @@ void inverse_move_to_front_transform(unsigned char* sequence, unsigned int num_b
         list[i] = i;
     }
 
-    for (unsigned int i = 0; i < num_bytes; i--) {
+    for (unsigned int i = 0; i < num_bytes; i++) {
         data_out[i] = list[sequence[i]];
         list[sequence[i]] = list[0];
         list[0] = list[sequence[i]];

@@ -86,13 +86,13 @@ void compress_data(unsigned char* original_data, unsigned char* compressed_data,
         unsigned int code = codes[original_data[i]];
         for (unsigned int j = 0; j < lengths[original_data[i]]; j++) {
             if ((code & (1 << j)) == (1 << j)) {
-                compressed_data[byte_offset] |= (1 << bit_offset); 
+                compressed_data[byte_offset] |= (1 << bit_offset);
             } else {
                 compressed_data[byte_offset] &= ~(1 << bit_offset);
             }
             bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
             if (bit_offset == 7) byte_offset++;
-        } 
+        }
     }
 }
 
@@ -101,8 +101,13 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     const unsigned int NUM_VALS = 256;
     unsigned int frequencies[NUM_VALS];
 
-    std::memset(frequencies, 0, NUM_VALS*sizeof(unsigned int));
+    data[num_bytes] = 255; //EOF char
+    unsigned char* bwt_data = new unsigned char[num_bytes];
+    burrow_wheelers_transform(data, num_bytes, bwt_data);
 
+    move_to_front_transform(bwt_data, num_bytes, data);
+
+    std::memset(frequencies, 0, NUM_VALS*sizeof(unsigned int));
     for (unsigned int i = 0; i < num_bytes; i++) {
         frequencies[data[i]]++;
     }
@@ -174,9 +179,8 @@ void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
             current = root;
         }
 
-	bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
-
-	if (bit_offset == 7) byte_offset++;
+        bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
+        if (bit_offset == 7) byte_offset++;
     }
 }
 
@@ -187,7 +191,7 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
 
     unsigned int decompressed_length;
     ifs.read(reinterpret_cast<char*>(&decompressed_length), sizeof(decompressed_length));
- 
+
     unsigned int compressed_length;
     ifs.read(reinterpret_cast<char*>(&compressed_length), sizeof(compressed_length));
 
@@ -196,6 +200,11 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
 
     unsigned char* decompressed_data = (unsigned char*)malloc(decompressed_length*sizeof(unsigned char));
     decode_data(compressed_data, compressed_length, decompressed_data, decompressed_length, root);
+
+    unsigned char* bwt_data = new unsigned char[decompressed_length];
+    inverse_move_to_front_transform(decompressed_data, decompressed_length, bwt_data);
+
+    inverse_burrow_wheelers_transform(bwt_data, decompressed_length, decompressed_data, 255);
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);

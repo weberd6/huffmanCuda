@@ -42,8 +42,6 @@ int main (int argc, char** argv)
         exit(1);
     }
 
-    long num_bytes = getFileSize(input_filename);
-    char* data = new char[num_bytes];
     std::ifstream ifs(input_filename.c_str());
     if(!ifs) {
         std::cout << "Failed to open file: " << input_filename << std::endl;
@@ -54,6 +52,8 @@ int main (int argc, char** argv)
     double duration;
 
     if (encode) {
+        long num_bytes = getFileSize(input_filename);
+        char* data = new char[num_bytes+1];
         ifs.read(data, num_bytes);
 
         if (parallel) {

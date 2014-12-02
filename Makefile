@@ -14,7 +14,7 @@ NVCC_OPTS=-O3 -arch=sm_20 -m64 -g
 
 GCC_OPTS=-O3 -m64
 
-NAME=huffman
+NAME=compress
 
 $(NAME): main.o histo.o min2.o compress.o decompress.o node.o parallel.o serial.o bwt.o mtf.o\
 serialize.o Makefile

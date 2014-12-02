@@ -39,6 +39,16 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]);
 void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename);
 void serial_huffman_decode(std::ifstream& ifs, std::string filename);
 
+void burrow_wheelers_transform(unsigned char* data_in, unsigned int num_bytes,
+                               unsigned char* data_out);
+void inverse_burrow_wheelers_transform(unsigned char* data_in, unsigned int num_bytes,
+                                       unsigned char* data_out, unsigned char EOF_char);
+
+void move_to_front_transform(unsigned char* data_in, unsigned int num_bytes,
+                             unsigned char* sequence);
+void inverse_move_to_front_transform(unsigned char* sequence, unsigned int num_bytes,
+                                     unsigned char* data_out);
+
 long getFileSize(std::string filename);
 void serialize_tree(Node* root, std::ofstream& ofs);
 void deserialize_tree(Node* &d_root, std::ifstream& ifs);
