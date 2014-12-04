@@ -13,9 +13,9 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     unsigned int* d_min_frequencies;
     unsigned int* d_min_indices;
 
-    unsigned int* h_frequencies = (unsigned int*)malloc(NUM_VALS*sizeof(unsigned int));
-    unsigned int* h_min_frequencies = (unsigned int*)malloc(2*sizeof(unsigned int));
-    unsigned int* h_min_indices = (unsigned int*)malloc(2*sizeof(unsigned int));
+    unsigned int* h_frequencies = new unsigned int[NUM_VALS];
+    unsigned int* h_min_frequencies = new unsigned int[2];
+    unsigned int* h_min_indices = new unsigned int[2];
 
     cudaMalloc(&d_vals, num_bytes*sizeof(unsigned char));
     cudaMalloc(&d_frequencies, NUM_VALS*sizeof(unsigned int));
@@ -78,7 +78,7 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     unsigned int* d_lengths;
     unsigned int* d_data_lengths;
     unsigned int* d_lengths_partial_sums;
-    unsigned char* d_encoded_data;
+    unsigned char* d_compressed_data;
     cudaMalloc(&d_codes, NUM_VALS*sizeof(unsigned int));
     cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
     cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
@@ -88,12 +88,18 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
 
     size_t compressed_num_bytes = get_compressed_length(d_lengths, d_vals, d_data_lengths, d_lengths_partial_sums, num_bytes);
+    cudaMalloc(&d_compressed_data, compressed_num_bytes*sizeof(unsigned char*));
 
-    cudaMalloc(&d_encoded_data, compressed_num_bytes*sizeof(unsigned char*));
-    compress_data(d_vals, d_codes, d_lengths, d_lengths_partial_sums, d_encoded_data, compressed_num_bytes);
+    unsigned int* d_block_offsets;
+    unsigned int num_blocks = ceil(num_bytes/(DATA_BLOCK_SIZE/256.0));
+    cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
 
-    unsigned char* h_encoded_data = (unsigned char*)malloc(compressed_num_bytes*sizeof(unsigned char));
-    cudaMemcpy(h_encoded_data, d_encoded_data, compressed_num_bytes*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    compress_data(d_vals, d_codes, d_lengths, d_lengths_partial_sums, d_block_offsets, d_compressed_data, num_bytes);
+    unsigned int* h_block_offsets = new unsigned int[num_blocks];
+    cudaMemcpy(h_block_offsets, d_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+
+    unsigned char* h_compressed_data = new unsigned char[compressed_num_bytes];
+    cudaMemcpy(h_compressed_data, d_compressed_data, compressed_num_bytes*sizeof(unsigned char), cudaMemcpyDeviceToHost);
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);
@@ -101,17 +107,16 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 
     serialize_tree(root, ofs);
-
-    //TODO save length partial sum for every 32 lengths for block offset used to decode
-
-    ofs.write(reinterpret_cast<const char*>(h_encoded_data), compressed_num_bytes);
-
+    ofs.write(reinterpret_cast<const char*>(&num_bytes), sizeof(num_bytes));
+    ofs.write(reinterpret_cast<const char*>(&compressed_num_bytes), sizeof(compressed_num_bytes));
+    ofs.write(reinterpret_cast<const char*>(h_block_offsets), num_blocks*sizeof(unsigned int));
+    ofs.write(reinterpret_cast<const char*>(h_compressed_data), compressed_num_bytes*sizeof(unsigned char));
     ofs.close();
 
-    free(h_frequencies);
-    free(h_min_frequencies);
-    free(h_min_indices);
-    free(h_encoded_data);
+    delete[] h_frequencies;
+    delete[] h_min_frequencies;
+    delete[] h_min_indices;
+    delete[] h_compressed_data;
 
     cudaFree(d_vals);
     cudaFree(d_frequencies);
@@ -122,23 +127,53 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaFree(d_lengths);
     cudaFree(d_data_lengths);
     cudaFree(d_lengths_partial_sums);
-    cudaFree(d_encoded_data);
+    cudaFree(d_compressed_data);
 }
 
 void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
 {
-    Node* h_root;
-    deserialize_tree(h_root, ifs);
+    Node* root;
+    deserialize_tree(root, ifs);
 
-    unsigned int max_length = 0; // TODO Max reduce to find maximum length which will give the depth of the tree
-    unsigned int array_size = 1 << (max_length+1);
+    unsigned int decompressed_length;
+    ifs.read(reinterpret_cast<char*>(&decompressed_length), sizeof(decompressed_length));
 
-    NodeArray* nodes = new NodeArray[array_size];
-    std::memset(nodes, 0, array_size*sizeof(NodeArray));
+    unsigned int compressed_length;
+    ifs.read(reinterpret_cast<char*>(&compressed_length), sizeof(compressed_length));
 
-    tree_to_array(nodes, 0, h_root);
+    unsigned char* compressed_data = new unsigned char[compressed_length];
+    ifs.read(reinterpret_cast<char*>(compressed_data), compressed_length);
 
-    //TODO copy tree to device
+    unsigned char* decompressed_data = new unsigned char[decompressed_length];
+
+    // Approximation on upper bound of maximum encoding length (16 bits)
+    //  so that a entire tree can be linearized.
+    // NOTE: Not all array elemements will be used unless the tree is perfect. (Which won't be the case)
+    // NOTE: This is just a guess FIXME
+    unsigned int array_size = 1 << 16;
+
+    NodeArray* h_nodes = new NodeArray[array_size];
+
+    tree_to_array(h_nodes, 0, root);
+
+    NodeArray* d_nodes;
+    cudaMalloc(&d_nodes, array_size*sizeof(NodeArray));
+    cudaMemcpy(d_nodes, h_nodes, array_size*sizeof(NodeArray), cudaMemcpyHostToDevice);
 
     //TODO call decode kernel
+
+    int lastindex = filename.find_last_of(".");
+    std::string name = filename.substr(0, lastindex);
+    std::string output_filename(name+".pd");
+    std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+
+//    decompressed_data[decompressed_length-1] = '\n';
+//    ofs.write(reinterpret_cast<const char*>(decompressed_data), decompressed_length);
+    ofs.close();
+
+    delete[] compressed_data;
+    delete[] decompressed_data;
+    delete[] h_nodes;
 }
+
+

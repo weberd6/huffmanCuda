@@ -4,25 +4,29 @@ __global__
 void compress(unsigned char* d_original_data,
                  unsigned int* d_codes,
                  unsigned int* d_lengths,
-                 unsigned int* d_lengths_partial_sums,
-                 unsigned char* d_encoded_data)
+                 unsigned int* d_block_offsets,
+                 unsigned char* d_compressed_data)
 {
+    const unsigned int BITS_PER_BYTE = 8;
+
     int id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    unsigned int byte_offset;
-    unsigned int bit_offset;
-    unsigned char symbol;
+    unsigned int block_offset = d_block_offsets[blockIdx.x];
+    unsigned int byte_offset = block_offset / BITS_PER_BYTE;
+    unsigned int bit_offset = BITS_PER_BYTE - 1 - (block_offset % BITS_PER_BYTE);
 
     for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
     {
-        byte_offset = d_lengths_partial_sums[id + i] / (8*sizeof(unsigned char));
-        bit_offset = d_lengths_partial_sums[id + i] % (8*sizeof(unsigned char));
-        symbol = d_original_data[id];
-
-        *((unsigned int*)&d_encoded_data[byte_offset]) =
-            ((d_codes[symbol] << (8*sizeof(unsigned int) - d_lengths[symbol])) >> bit_offset)
-
-                | *((unsigned int*)&d_encoded_data[byte_offset]);
+        unsigned int code = d_codes[d_original_data[id + i]];
+        for (unsigned int j = 0; j < d_lengths[d_original_data[id + i]]; j++) {
+            if ((code & (1 << j)) == (1 << j)) {
+                d_compressed_data[byte_offset] |= (1 << bit_offset);
+            } else {
+                d_compressed_data[byte_offset] &= ~(1 << bit_offset);
+            }
+            bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
+            if (bit_offset == 7) byte_offset++;
+        }
     }
 }
 
@@ -169,6 +173,15 @@ void set_data_lengths(unsigned int* d_lengths,
     d_data_lengths[i] = d_lengths[d_data_in[i]];
 }
 
+__global__
+void length_partial_sums_to_block_offsets(unsigned int* d_lengths_partial_sums, unsigned int* d_block_offsets)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if ((i % (DATA_BLOCK_SIZE/blockDim.x)) == 0) {
+        d_block_offsets[i/(DATA_BLOCK_SIZE/blockDim.x)] = d_lengths_partial_sums[i];
+    }
+}
+
 void large_scan_sum(unsigned int* const d_in,
                     unsigned int* d_all_sums,
                     const size_t numElems)
@@ -201,10 +214,10 @@ void large_scan_sum(unsigned int* const d_in,
 }
 
 size_t get_compressed_length(unsigned int* d_lengths,
-                                   unsigned char* d_original_data,
-                                   unsigned int* d_data_lengths,
-                                   unsigned int* d_lengths_partial_sums,
-                                   const size_t num_bytes)
+                             unsigned char* d_original_data,
+                             unsigned int* d_data_lengths,
+                             unsigned int* d_lengths_partial_sums,
+                             const size_t num_bytes)
 {
     unsigned int compressed_num_bytes;
 
@@ -226,12 +239,15 @@ void compress_data(unsigned char* d_original_data,
                    unsigned int* d_codes,
                    unsigned int* d_lengths,
                    unsigned int* d_lengths_partial_sums,
-                   unsigned char* d_encoded_data,
-		   size_t compressed_num_bytes)
+                   unsigned int* d_block_offsets,
+                   unsigned char* d_compressed_data,
+		   size_t num_bytes)
 {
-    int numBlocks = ceil(((float)compressed_num_bytes)/256);
-    compress<<<numBlocks, 256>>>(d_original_data, d_codes, d_lengths, d_lengths_partial_sums,
-	d_encoded_data);
+    int numBlocks = ceil(((float)num_bytes)/256);
+
+    length_partial_sums_to_block_offsets<<<numBlocks, 256>>>(d_lengths_partial_sums, d_block_offsets);
+
+    compress<<<numBlocks, 256>>>(d_original_data, d_codes, d_lengths, d_block_offsets, d_compressed_data);
 
 }
 

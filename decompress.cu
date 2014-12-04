@@ -37,22 +37,40 @@ void reduce_max(const unsigned int* d_in,
 __global__
 void decompress(unsigned char* d_compressed_data,
                 NodeArray* d_huffman_tree,
-                unsigned int* d_block_length,
-                unsigned int* d_block_length_sums,
-                unsigned char* d_decoded_data,
+                unsigned int* d_block_offsets,
+                unsigned char* d_decompressed_data,
                 const size_t num_bytes)
 {
-/*    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int BITS_PER_BYTE = 8;
 
-    unsigned int j = 0; // Root index
-    unsigned int n = d_block_length[blockIdx.x]-1;
-    unsigned int d_block_end_offset = d_block_length_sums[blockIdx.x] + n;
-    bool go_left;
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
-    {
-        
-    }*/
+    unsigned int block_offset = d_block_offsets[blockIdx.x];
+    unsigned int byte_offset = block_offset / BITS_PER_BYTE;
+    unsigned int bit_offset = BITS_PER_BYTE - 1 - (block_offset % BITS_PER_BYTE);  
+    bool go_right;
+
+    unsigned int current = 0; // rooot
+
+    for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++) {
+        go_right = ((d_compressed_data[byte_offset] & (1 << (bit_offset))) == (1 << (bit_offset)));
+
+        if (go_right) {
+            current = d_huffman_tree[current].right;
+        } else {
+            current = d_huffman_tree[current].left;
+        }
+
+        if ((d_huffman_tree[d_huffman_tree[current].left].left != -1) 
+            	&& (d_huffman_tree[d_huffman_tree[current].right].left != -1)) {
+
+            d_decompressed_data[id + i] = d_huffman_tree[current].symbol_index;
+            current = 0;
+        }
+
+        bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
+        if (bit_offset == 7) byte_offset++;
+    }
 }
 
 

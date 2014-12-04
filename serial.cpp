@@ -126,7 +126,6 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     huffman_code(root, a, frequencies, codes, lengths, NUM_VALS);
 
     unsigned int* data_lengths = new unsigned int[num_bytes];
-    unsigned int* lengths_partial_sums = new unsigned int[num_bytes];
     unsigned int compressed_length = 0;
     for (unsigned int i = 0; i < num_bytes; i++) {
         data_lengths[i] = lengths[data[i]];
@@ -148,8 +147,14 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     ofs.write(reinterpret_cast<const char*>(&num_bytes), sizeof(num_bytes));
     ofs.write(reinterpret_cast<const char*>(&compressed_length), sizeof(compressed_length));
     ofs.write(reinterpret_cast<const char*>(compressed_data), compressed_length);
-
     ofs.close();
+
+    delete[] bwt_data;
+    delete[] a;
+    delete[] lengths;
+    delete[] codes;
+    delete[] data_lengths;
+    delete[] compressed_data;
 }
 
 void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
@@ -214,5 +219,9 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
     decompressed_data[decompressed_length-1] = '\n';
     ofs.write(reinterpret_cast<const char*>(decompressed_data), decompressed_length);
     ofs.close();
+
+    delete[] compressed_data;
+    delete[] decompressed_data;
+    delete[] bwt_data;
 }
 

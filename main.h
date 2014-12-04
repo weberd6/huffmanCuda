@@ -11,7 +11,7 @@
 
 #define checkCudaErrors(val) check( (val), #val, __FILE__, __LINE__)
 
-const unsigned int DATA_BLOCK_SIZE = 4096;
+const unsigned int DATA_BLOCK_SIZE = 8192;
 
 struct NodeArray {
     NodeArray() {
@@ -85,8 +85,9 @@ void compress_data(unsigned char* d_original_data,
                    unsigned int* d_codes,
                    unsigned int* d_lengths,
                    unsigned int* d_lengths_partial_sums,
-                   unsigned char* d_encoded_data,
-		   size_t compressed_num_bytes);
+                   unsigned int* d_block_offsets,
+                   unsigned char* d_compressed_data,
+                   size_t num_bytes);
 
 #endif
 
