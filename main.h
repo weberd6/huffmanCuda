@@ -42,7 +42,7 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename);
 void burrow_wheelers_transform(unsigned char* data_in, unsigned int num_bytes,
                                unsigned char* data_out);
 void inverse_burrow_wheelers_transform(unsigned char* data_in, unsigned int num_bytes,
-                                       unsigned char* data_out, unsigned char EOF_char);
+                                       unsigned char* data_out, unsigned int EOF_char);
 
 void move_to_front_transform(unsigned char* data_in, unsigned int num_bytes,
                              unsigned char* sequence);

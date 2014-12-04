@@ -1,5 +1,5 @@
 CC=g++
-NVCC=/usr/bin/nvcc
+NVCC=/usr/local/cuda-5.0/bin/nvcc
 
 CUDA_INCLUDEPATH=/usr/local/cuda-5.0/include
 #CUDA_INCLUDEPATH=/usr/local/cuda/lib64/include
@@ -10,9 +10,9 @@ CUDA_INCLUDEPATH=/usr/local/cuda-5.0/include
 CUDA_LIBPATH=/usr/local/cuda-5.0/lib64
 #CUDA_LIBPATH=/usr/local/cuda/lib
 
-NVCC_OPTS=-O3 -arch=sm_20 -m64 -g
+NVCC_OPTS=-arch=sm_20 -m64 -g
 
-GCC_OPTS=-O3 -m64
+GCC_OPTS=-m64
 
 NAME=compress
 

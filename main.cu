@@ -53,7 +53,7 @@ int main (int argc, char** argv)
 
     if (encode) {
         long num_bytes = getFileSize(input_filename);
-        char* data = new char[num_bytes+1];
+        char* data = new char[num_bytes];
         ifs.read(data, num_bytes);
 
         if (parallel) {
