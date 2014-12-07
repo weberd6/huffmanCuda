@@ -87,7 +87,7 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMemcpy(d_codes, codes, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
 
-    size_t compressed_num_bytes = get_compressed_length(d_lengths, d_vals, d_data_lengths, d_lengths_partial_sums, num_bytes);
+    unsigned int compressed_num_bytes = get_compressed_length(d_lengths, d_vals, d_data_lengths, d_lengths_partial_sums, num_bytes);
     cudaMalloc(&d_compressed_data, compressed_num_bytes*sizeof(unsigned char*));
 
     unsigned int* d_block_offsets;
@@ -95,6 +95,7 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
 
     compress_data(d_vals, d_codes, d_lengths, d_lengths_partial_sums, d_block_offsets, d_compressed_data, num_bytes);
+
     unsigned int* h_block_offsets = new unsigned int[num_blocks];
     cudaMemcpy(h_block_offsets, d_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
@@ -141,10 +142,19 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     unsigned int compressed_length;
     ifs.read(reinterpret_cast<char*>(&compressed_length), sizeof(compressed_length));
 
-    unsigned char* compressed_data = new unsigned char[compressed_length];
-    ifs.read(reinterpret_cast<char*>(compressed_data), compressed_length);
+    unsigned int num_blocks = ceil(decompressed_length/(DATA_BLOCK_SIZE/256.0));
 
-    unsigned char* decompressed_data = new unsigned char[decompressed_length];
+    unsigned int* h_block_offsets = new unsigned int[num_blocks];
+    unsigned int* d_block_offsets;
+    cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
+    ifs.read(reinterpret_cast<char*>(h_block_offsets), num_blocks*sizeof(unsigned int));
+    cudaMemcpy(d_block_offsets, h_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyHostToDevice);
+
+    unsigned char* h_compressed_data = new unsigned char[compressed_length];
+    unsigned char* d_compressed_data;
+    cudaMalloc(&d_compressed_data, compressed_length*sizeof(unsigned char));
+    ifs.read(reinterpret_cast<char*>(h_compressed_data), compressed_length*sizeof(unsigned char));
+    cudaMemcpy(d_compressed_data, h_compressed_data, compressed_length*sizeof(unsigned char), cudaMemcpyHostToDevice);
 
     // Approximation on upper bound of maximum encoding length (16 bits)
     //  so that a entire tree can be linearized.
@@ -152,28 +162,40 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     // NOTE: This is just a guess FIXME
     unsigned int array_size = 1 << 16;
 
-    NodeArray* h_nodes = new NodeArray[array_size];
+    NodeArray* h_huffman_tree = new NodeArray[array_size];
 
-    tree_to_array(h_nodes, 0, root);
+    tree_to_array(h_huffman_tree, 0, root);
 
-    NodeArray* d_nodes;
-    cudaMalloc(&d_nodes, array_size*sizeof(NodeArray));
-    cudaMemcpy(d_nodes, h_nodes, array_size*sizeof(NodeArray), cudaMemcpyHostToDevice);
+    NodeArray* d_huffman_tree;
+    cudaMalloc(&d_huffman_tree, array_size*sizeof(NodeArray));
+    cudaMemcpy(d_huffman_tree, h_huffman_tree, array_size*sizeof(NodeArray), cudaMemcpyHostToDevice);
 
-    //TODO call decode kernel
+    unsigned char* d_decompressed_data;
+    cudaMalloc(&d_decompressed_data, decompressed_length*sizeof(unsigned char));
+    decompress_data(d_compressed_data, d_huffman_tree, d_block_offsets, d_decompressed_data,
+                    decompressed_length);
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);
     std::string output_filename(name+".pd");
     std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 
-//    decompressed_data[decompressed_length-1] = '\n';
-//    ofs.write(reinterpret_cast<const char*>(decompressed_data), decompressed_length);
+    unsigned char* h_decompressed_data = new unsigned char[decompressed_length];
+    cudaMemcpy(h_decompressed_data, d_decompressed_data, decompressed_length*sizeof(unsigned char),  cudaMemcpyDeviceToHost);
+
+    h_decompressed_data[decompressed_length-1] = '\n';
+    ofs.write(reinterpret_cast<const char*>(h_decompressed_data), decompressed_length*sizeof(unsigned char));
     ofs.close();
 
-    delete[] compressed_data;
-    delete[] decompressed_data;
-    delete[] h_nodes;
+    delete[] h_block_offsets;
+    delete[] h_compressed_data;
+    delete[] h_huffman_tree;
+    delete[] h_decompressed_data;
+
+    cudaFree(d_block_offsets);
+    cudaFree(d_compressed_data);
+    cudaFree(d_huffman_tree);
+    cudaFree(d_decompressed_data);
 }
 
 

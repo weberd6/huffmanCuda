@@ -5,20 +5,28 @@ void compress(unsigned char* d_original_data,
                  unsigned int* d_codes,
                  unsigned int* d_lengths,
                  unsigned int* d_block_offsets,
-                 unsigned char* d_compressed_data)
+                 unsigned char* d_compressed_data,
+                 size_t num_bytes)
 {
     const unsigned int BITS_PER_BYTE = 8;
 
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    int id = blockIdx.x * blockDim.x;
 
-    unsigned int block_offset = d_block_offsets[blockIdx.x];
+    unsigned int block_offset = d_block_offsets[id + threadIdx.x];
     unsigned int byte_offset = block_offset / BITS_PER_BYTE;
     unsigned int bit_offset = BITS_PER_BYTE - 1 - (block_offset % BITS_PER_BYTE);
 
-    for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++)
-    {
-        unsigned int code = d_codes[d_original_data[id + i]];
-        for (unsigned int j = 0; j < d_lengths[d_original_data[id + i]]; j++) {
+    unsigned int code;
+    unsigned int index;
+
+    for (int i = 0; i < (DATA_BLOCK_SIZE/blockDim.x); i++) {
+
+        if ((id + i) >= num_bytes)
+            break;
+
+        index = blockIdx.x * DATA_BLOCK_SIZE + threadIdx.x * DATA_BLOCK_SIZE/blockDim.x + i;
+        code = d_codes[d_original_data[index]];
+        for (unsigned int j = 0; j < d_lengths[d_original_data[index]]; j++) {
             if ((code & (1 << j)) == (1 << j)) {
                 d_compressed_data[byte_offset] |= (1 << bit_offset);
             } else {
@@ -69,7 +77,7 @@ void blelloch_scan_sum(unsigned int* d_in,
             int ai = offset*(2*threadId+1)-1;
             int bi = offset*(2*threadId+2)-1;
 
-            float t = shdata[ai];
+            unsigned int t = shdata[ai];
             shdata[ai] = shdata[bi];
             shdata[bi] += t;
         }
@@ -104,8 +112,8 @@ void blelloch_scan_sum_large(unsigned int* const d_in,
         {
             int ai = offset*(2*threadId+1)-1;
             int bi = offset*(2*threadId+2)-1;
-
-        d_sums_all[start_index + bi] += d_sums_all[start_index + ai];
+        
+            d_sums_all[start_index + bi] += d_sums_all[start_index + ai];
         }
         offset *= 2;
     }
@@ -125,7 +133,7 @@ void blelloch_scan_sum_large(unsigned int* const d_in,
             int ai = offset*(2*threadId+1)-1;
             int bi = offset*(2*threadId+2)-1;
 
-            float t = d_sums_all[start_index + ai];
+            unsigned int t = d_sums_all[start_index + ai];
             d_sums_all[start_index + ai] = d_sums_all[start_index + bi];
             d_sums_all[start_index + bi] += t;
         }
@@ -243,11 +251,11 @@ void compress_data(unsigned char* d_original_data,
                    unsigned char* d_compressed_data,
 		   size_t num_bytes)
 {
-    int numBlocks = ceil(((float)num_bytes)/256);
+    int nb = ceil(((float)num_bytes/256));
+    length_partial_sums_to_block_offsets<<<nb, 256>>>(d_lengths_partial_sums, d_block_offsets);
 
-    length_partial_sums_to_block_offsets<<<numBlocks, 256>>>(d_lengths_partial_sums, d_block_offsets);
-
-    compress<<<numBlocks, 256>>>(d_original_data, d_codes, d_lengths, d_block_offsets, d_compressed_data);
+    int numBlocks = ceil(((float)num_bytes)/DATA_BLOCK_SIZE);
+    compress<<<numBlocks, 256>>>(d_original_data, d_codes, d_lengths, d_block_offsets, d_compressed_data, num_bytes);
 
 }
 

@@ -14,10 +14,6 @@
 const unsigned int DATA_BLOCK_SIZE = 8192;
 
 struct NodeArray {
-    NodeArray() {
-        left = -1;
-        right = -1;
-    }
     unsigned int symbol_index;
     int left;
     int right;
@@ -53,7 +49,8 @@ long getFileSize(std::string filename);
 void serialize_tree(Node* root, std::ofstream& ofs);
 void deserialize_tree(Node* &d_root, std::ifstream& ifs);
 void tree_to_array(NodeArray* nodes, unsigned int index, Node* root);
-void print_tree(Node* root);
+void print_tree(Node* root, unsigned int &c);
+void print_array_tree(NodeArray* tree, unsigned int root, unsigned int &c);
 
 // These functions all make kernel calls
 void computeHistogram(const unsigned char* const d_vals, //INPUT
@@ -88,6 +85,12 @@ void compress_data(unsigned char* d_original_data,
                    unsigned int* d_block_offsets,
                    unsigned char* d_compressed_data,
                    size_t num_bytes);
+
+void decompress_data(unsigned char* d_compressed_data,
+                     NodeArray* d_huffman_tree,
+                     unsigned int* d_block_offsets,
+                     unsigned char* d_decompressed_data,
+                     unsigned int num_bytes);
 
 #endif
 
