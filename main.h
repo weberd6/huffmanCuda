@@ -11,7 +11,7 @@
 
 #define checkCudaErrors(val) check( (val), #val, __FILE__, __LINE__)
 
-const unsigned int DATA_BLOCK_SIZE = 8192;
+const unsigned int DATA_BLOCK_SIZE = 4096;
 
 struct NodeArray {
     unsigned int symbol_index;

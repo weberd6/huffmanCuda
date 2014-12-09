@@ -10,7 +10,7 @@ void compress(unsigned char* d_original_data,
 {
     const unsigned int BITS_PER_BYTE = 8;
 
-    int id = blockIdx.x * blockDim.x;
+    unsigned int id = blockIdx.x * blockDim.x;
 
     unsigned int block_offset = d_block_offsets[id + threadIdx.x];
     unsigned int byte_offset = block_offset / BITS_PER_BYTE;

@@ -160,7 +160,7 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     //  so that a entire tree can be linearized.
     // NOTE: Not all array elemements will be used unless the tree is perfect. (Which won't be the case)
     // NOTE: This is just a guess FIXME
-    unsigned int array_size = 1 << 16;
+    unsigned int array_size = 1 << 17;
 
     NodeArray* h_huffman_tree = new NodeArray[array_size];
 
@@ -183,7 +183,7 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     unsigned char* h_decompressed_data = new unsigned char[decompressed_length];
     cudaMemcpy(h_decompressed_data, d_decompressed_data, decompressed_length*sizeof(unsigned char),  cudaMemcpyDeviceToHost);
 
-    h_decompressed_data[decompressed_length-1] = '\n';
+//    h_decompressed_data[decompressed_length-1] = '\n';
     ofs.write(reinterpret_cast<const char*>(h_decompressed_data), decompressed_length*sizeof(unsigned char));
     ofs.close();
 

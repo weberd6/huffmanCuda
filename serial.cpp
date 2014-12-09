@@ -101,11 +101,11 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     const unsigned int NUM_VALS = 256;
     unsigned int frequencies[NUM_VALS];
 
-    data[num_bytes-1] = 254; //EOF char
-    unsigned char* bwt_data = new unsigned char[num_bytes];
-    burrow_wheelers_transform(data, num_bytes, bwt_data);
+//    data[num_bytes-1] = 254; //EOF char
+//    unsigned char* bwt_data = new unsigned char[num_bytes];
+//    burrow_wheelers_transform(data, num_bytes, bwt_data);
 
-    move_to_front_transform(bwt_data, num_bytes, data);
+//    move_to_front_transform(bwt_data, num_bytes, data);
 
     std::memset(frequencies, 0, NUM_VALS*sizeof(unsigned int));
     for (unsigned int i = 0; i < num_bytes; i++) {
@@ -149,7 +149,7 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     ofs.write(reinterpret_cast<const char*>(compressed_data), compressed_length);
     ofs.close();
 
-    delete[] bwt_data;
+//    delete[] bwt_data;
     delete[] a;
     delete[] lengths;
     delete[] codes;
@@ -206,22 +206,22 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
     unsigned char* decompressed_data = new unsigned char[decompressed_length];
     decode_data(compressed_data, compressed_length, decompressed_data, decompressed_length, root);
 
-    unsigned char* bwt_data = new unsigned char[decompressed_length];
-    inverse_move_to_front_transform(decompressed_data, decompressed_length, bwt_data);
+//    unsigned char* bwt_data = new unsigned char[decompressed_length];
+//    inverse_move_to_front_transform(decompressed_data, decompressed_length, bwt_data);
 
-    inverse_burrow_wheelers_transform(bwt_data, decompressed_length, decompressed_data, 254);
+//    inverse_burrow_wheelers_transform(bwt_data, decompressed_length, decompressed_data, 254);
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);
     std::string output_filename(name+".sd");
     std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 
-    decompressed_data[decompressed_length-1] = '\n';
+//    decompressed_data[decompressed_length-1] = '\n';
     ofs.write(reinterpret_cast<const char*>(decompressed_data), decompressed_length);
     ofs.close();
 
     delete[] compressed_data;
     delete[] decompressed_data;
-    delete[] bwt_data;
+//    delete[] bwt_data;
 }
 
