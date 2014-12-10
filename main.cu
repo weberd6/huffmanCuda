@@ -48,29 +48,35 @@ int main (int argc, char** argv)
         exit(1);
     }
 
-    std::clock_t start = std::clock();
-    double duration;
-
     if (encode) {
         long num_bytes = getFileSize(input_filename);
         char* data = new char[num_bytes];
         ifs.read(data, num_bytes);
+
+        std::clock_t start = std::clock();
+        double duration;
 
         if (parallel) {
             parallel_huffman_encode(reinterpret_cast<unsigned char*>(data), num_bytes, input_filename);
         } else {
             serial_huffman_encode(reinterpret_cast<unsigned char*>(data), num_bytes, input_filename);
         }
+
+        duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+        std::cout << "Total time: " << duration*1000 << " ms" << std::endl;
     } else {
+        std::clock_t start = std::clock();
+        double duration;
+
         if (parallel) {
             parallel_huffman_decode(ifs, input_filename);
         } else {
             serial_huffman_decode(ifs, input_filename);
         }
-    }
 
-    duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
-    std::cout << "Elapsed time: " << duration*1000 << " ms" << std::endl;
+        duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+        std::cout << "Total time: " << duration*1000 << " ms" << std::endl;
+    }
 
     ifs.close();
 

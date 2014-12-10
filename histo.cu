@@ -85,7 +85,7 @@ void computeHistogram(const unsigned char* const d_vals, //INPUT
                       const unsigned int numBins,
                       const unsigned int numElems)
 {
-    const int threadsPerBlock = 1024;
+    const int threadsPerBlock = 256;
     int numBlocks = ceil(((float)numElems)/threadsPerBlock);
     histo<<<numBlocks, threadsPerBlock, threadsPerBlock*sizeof(unsigned int)>>>
         (d_vals, d_histo, numElems);

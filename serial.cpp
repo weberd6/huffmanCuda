@@ -4,6 +4,7 @@
 #include <cmath>
 #include <fstream>
 #include <cstring>
+#include <ctime>
 
 #include "node.h"
 #include "main.h"
@@ -107,10 +108,14 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
 
 //    move_to_front_transform(bwt_data, num_bytes, data);
 
+    std::clock_t histogram_start = std::clock();
+    double duration;
     std::memset(frequencies, 0, NUM_VALS*sizeof(unsigned int));
     for (unsigned int i = 0; i < num_bytes; i++) {
         frequencies[data[i]]++;
     }
+    duration = ( std::clock() - histogram_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Histogram time: " << duration*1000 << " ms" << std::endl;
 
     unsigned char* a = new unsigned char[NUM_VALS];
     for (unsigned int i = 0; i < NUM_VALS; i++) {
@@ -123,7 +128,10 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     std::memset(codes, 0, NUM_VALS*sizeof(unsigned int));
 
     Node* root;
+    std::clock_t build_tree_start = std::clock();
     huffman_code(root, a, frequencies, codes, lengths, NUM_VALS);
+    duration = ( std::clock() - build_tree_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Build tree time: " << duration*1000 << " ms" << std::endl;   
 
     unsigned int* data_lengths = new unsigned int[num_bytes];
     unsigned int compressed_length = 0;
@@ -136,7 +144,11 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
     compressed_length = std::ceil(compressed_length/8.0);
 
     unsigned char* compressed_data = new unsigned char[compressed_length];
+
+    std::clock_t compress_start = std::clock();
     compress_data(data, compressed_data, lengths, codes, num_bytes);
+    duration = ( std::clock() - compress_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Compress time: " << duration*1000 << " ms" << std::endl;
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);
@@ -204,7 +216,12 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
     ifs.read(reinterpret_cast<char*>(compressed_data), compressed_length);
 
     unsigned char* decompressed_data = new unsigned char[decompressed_length];
+
+    std::clock_t decompress_start = std::clock();
+    double duration;
     decode_data(compressed_data, compressed_length, decompressed_data, decompressed_length, root);
+    duration = ( std::clock() - decompress_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Decompress time: " << duration*1000 << " ms" << std::endl;
 
 //    unsigned char* bwt_data = new unsigned char[decompressed_length];
 //    inverse_move_to_front_transform(decompressed_data, decompressed_length, bwt_data);

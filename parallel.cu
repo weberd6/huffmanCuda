@@ -1,5 +1,6 @@
 #include <fstream>
 #include <cstring>
+#include <ctime>
 
 #include "main.h"
 #include "node.h"
@@ -7,25 +8,46 @@
 void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename)
 {
     const unsigned int NUM_VALS = 256;
+    double duration;
 
     unsigned char* d_vals;
     unsigned int* d_frequencies;
     unsigned int* d_min_frequencies;
     unsigned int* d_min_indices;
+    unsigned int* d_codes;
+    unsigned int* d_lengths;
+    unsigned int* d_data_lengths;
+    unsigned int* d_lengths_partial_sums;
+    unsigned char* d_compressed_data;
 
     unsigned int* h_frequencies = new unsigned int[NUM_VALS];
     unsigned int* h_min_frequencies = new unsigned int[2];
     unsigned int* h_min_indices = new unsigned int[2];
 
+    std::clock_t malloc_start = std::clock();
+
     cudaMalloc(&d_vals, num_bytes*sizeof(unsigned char));
     cudaMalloc(&d_frequencies, NUM_VALS*sizeof(unsigned int));
     cudaMalloc(&d_min_frequencies, 2*sizeof(unsigned int));
     cudaMalloc(&d_min_indices, 2*sizeof(unsigned int));
+    cudaMalloc(&d_codes, NUM_VALS*sizeof(unsigned int));
+    cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
+    cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
+    cudaMalloc(&d_lengths_partial_sums, num_bytes*sizeof(unsigned int));
+
+    duration = ( std::clock() - malloc_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Malloc time: " << duration*1000 << " ms" << std::endl;
+
+    std::clock_t histogram_start = std::clock();
 
     cudaMemcpy(d_vals, data, num_bytes*sizeof(unsigned char), cudaMemcpyHostToDevice);
-
     cudaMemset(d_frequencies, 0, NUM_VALS*sizeof(unsigned int));
+
     computeHistogram(d_vals, d_frequencies, NUM_VALS, num_bytes);
+    duration = ( std::clock() - histogram_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Histogram time: " << duration*1000 << " ms" << std::endl;
+
+    std::clock_t build_tree_start = std::clock();
 
     unsigned int count = NUM_VALS;
     unsigned int* d_count;
@@ -66,6 +88,7 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
         count--;
     }
 
+
     unsigned int codes[NUM_VALS];
     unsigned int lengths[NUM_VALS];
 
@@ -74,15 +97,10 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
 
     generate_code(root, codes, lengths);
 
-    unsigned int* d_codes;
-    unsigned int* d_lengths;
-    unsigned int* d_data_lengths;
-    unsigned int* d_lengths_partial_sums;
-    unsigned char* d_compressed_data;
-    cudaMalloc(&d_codes, NUM_VALS*sizeof(unsigned int));
-    cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
-    cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
-    cudaMalloc(&d_lengths_partial_sums, num_bytes*sizeof(unsigned int));
+    duration = ( std::clock() - build_tree_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Build tree time: " << duration*1000 << " ms" << std::endl;
+
+    std::clock_t compression_start = std::clock();
     
     cudaMemcpy(d_codes, codes, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_lengths, lengths, NUM_VALS*sizeof(unsigned int), cudaMemcpyHostToDevice);
@@ -95,6 +113,8 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
 
     compress_data(d_vals, d_codes, d_lengths, d_lengths_partial_sums, d_block_offsets, d_compressed_data, num_bytes);
+    duration = ( std::clock() - compression_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Compression time: " << duration*1000 << " ms" << std::endl;
 
     unsigned int* h_block_offsets = new unsigned int[num_blocks];
     cudaMemcpy(h_block_offsets, d_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyDeviceToHost);
@@ -132,7 +152,12 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
 }
 
 void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
-{
+{ 
+    unsigned int* d_block_offsets;
+    unsigned char* d_compressed_data;
+
+    double duration;
+
     Node* root;
     deserialize_tree(root, ifs);
 
@@ -144,15 +169,13 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
 
     unsigned int num_blocks = ceil(decompressed_length/(DATA_BLOCK_SIZE/256.0));
 
-    unsigned int* h_block_offsets = new unsigned int[num_blocks];
-    unsigned int* d_block_offsets;
     cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
+    unsigned int* h_block_offsets = new unsigned int[num_blocks];
     ifs.read(reinterpret_cast<char*>(h_block_offsets), num_blocks*sizeof(unsigned int));
     cudaMemcpy(d_block_offsets, h_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyHostToDevice);
 
-    unsigned char* h_compressed_data = new unsigned char[compressed_length];
-    unsigned char* d_compressed_data;
     cudaMalloc(&d_compressed_data, compressed_length*sizeof(unsigned char));
+    unsigned char* h_compressed_data = new unsigned char[compressed_length];
     ifs.read(reinterpret_cast<char*>(h_compressed_data), compressed_length*sizeof(unsigned char));
     cudaMemcpy(d_compressed_data, h_compressed_data, compressed_length*sizeof(unsigned char), cudaMemcpyHostToDevice);
 
@@ -162,8 +185,9 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     // NOTE: This is just a guess FIXME
     unsigned int array_size = 1 << 17;
 
-    NodeArray* h_huffman_tree = new NodeArray[array_size];
+    std::clock_t decompression_start = std::clock();
 
+    NodeArray* h_huffman_tree = new NodeArray[array_size];
     tree_to_array(h_huffman_tree, 0, root);
 
     NodeArray* d_huffman_tree;
@@ -174,6 +198,9 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     cudaMalloc(&d_decompressed_data, decompressed_length*sizeof(unsigned char));
     decompress_data(d_compressed_data, d_huffman_tree, d_block_offsets, d_decompressed_data,
                     decompressed_length);
+
+    duration = ( std::clock() - decompression_start ) / (double) CLOCKS_PER_SEC;
+    std::cout << "Decompression time: " << duration*1000 << " ms" << std::endl;
 
     int lastindex = filename.find_last_of(".");
     std::string name = filename.substr(0, lastindex);
@@ -187,7 +214,6 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     ofs.write(reinterpret_cast<const char*>(h_decompressed_data), decompressed_length*sizeof(unsigned char));
     ofs.close();
 
-    delete[] h_block_offsets;
     delete[] h_compressed_data;
     delete[] h_huffman_tree;
     delete[] h_decompressed_data;
