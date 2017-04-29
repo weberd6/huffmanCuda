@@ -199,7 +199,7 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename) {
     //  so that a entire tree can be linearized.
     // NOTE: Not all array elemements will be used unless the tree is perfect. (Which won't be the case)
     // NOTE: This is just a guess FIXME
-    unsigned int array_size = 1 << 18;
+    unsigned int array_size = 1 << 20;
 
     std::clock_t decompression_start = std::clock();
 

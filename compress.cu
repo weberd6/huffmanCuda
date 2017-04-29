@@ -235,7 +235,11 @@ void large_scan_sum(unsigned int* const d_in,
     unsigned int* incr;
     cudaMalloc(&incr, numBlocks2*sizeof(unsigned int));
     cudaMemset(incr, 0, numBlocks2*sizeof(unsigned int));
+ 
     blelloch_scan_sum<<<1, numBlocks2/2, numBlocks2*sizeof(unsigned int)>>>(padded_sums, incr, numBlocks2);
+
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 
     add_constant<<<numBlocks, B>>>(d_all_sums, incr, numElems);
 
