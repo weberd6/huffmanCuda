@@ -1,25 +1,17 @@
-CC=g++
-NVCC=/usr/local/cuda-5.0/bin/nvcc
+NVCC=/usr/local/cuda/bin/nvcc
 
-CUDA_INCLUDEPATH=/usr/local/cuda-5.0/include
-#CUDA_INCLUDEPATH=/usr/local/cuda/lib64/include
-#CUDA_INCLUDEPATH=/usr/local/cuda-5.0/include
-#CUDA_INCLUDEPATH=/Developer/NVIDIA/CUDA-5.0/include
-#CUDA_INCLUDEPATH=/usr/local/cuda/include
+CUDA_INCLUDEPATH=/usr/local/cuda/include
 
-CUDA_LIBPATH=/usr/local/cuda-5.0/lib64
-#CUDA_LIBPATH=/usr/local/cuda/lib
+CUDA_LIBPATH=/usr/local/cuda/lib
 
-NVCC_OPTS=-arch=sm_20 -m64 -g
-
-GCC_OPTS=-m64
+NVCC_OPTS=-Wno-deprecated-gpu-targets #-ccbin=gcc-4.8
 
 NAME=compress
 
 $(NAME): main.o histo.o min2.o compress.o decompress.o node.o parallel.o serial.o bwt.o mtf.o\
 serialize.o Makefile
 	$(NVCC) -o $(NAME) main.o histo.o min2.o compress.o decompress.o node.o parallel.o \
-	serial.o bwt.o mtf.o serialize.o -L $(NVCC_OPTS)
+	serial.o bwt.o mtf.o serialize.o $(NVCC_OPTS)
 
 main.o: main.cu main.h node.h
 	$(NVCC) -c main.cu  -l $(CUDA_LIBPATH) -I $(CUDA_INCLUDEPATH) $(NVCC_OPTS)
@@ -37,22 +29,22 @@ decompress.o: decompress.cu main.h
 	$(NVCC) -c decompress.cu $(NVCC_OPTS)
 
 node.o: node.cpp node.h
-	$(CC) -c node.cpp $(GCC_OPTS)
+	$(NVCC) -c node.cpp $(NVCC_OPTS)
 
 parallel.o: parallel.cu main.h
 	$(NVCC) -c parallel.cu $(NVCC_OPTS)
 
 serial.o: serial.cpp main.h
-	$(CC) -c serial.cpp $(GCC_OPTS)
+	$(NVCC) -c serial.cpp $(NVCC_OPTS)
 
 bwt.o: bwt.cpp main.h
-	$(CC) -c bwt.cpp $(GCC_OPTS)
+	$(NVCC) -c bwt.cpp $(NVCC_OPTS)
 
 mtf.o: mtf.cpp main.h
-	$(CC) -c mtf.cpp $(GCC_OPTS)
+	$(NVCC) -c mtf.cpp $(NVCC_OPTS)
 
 serialize.o: serialize.cpp main.h
-	$(CC) -c serialize.cpp $(GCC_OPTS)
+	$(NVCC) -c serialize.cpp $(NVCC_OPTS)
 
 clean:
 	rm -f *.o $(NAME)

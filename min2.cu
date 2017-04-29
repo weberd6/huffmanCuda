@@ -3,8 +3,8 @@
 __global__
 void reduce_min2(const unsigned int* d_in,
                 unsigned int* d_vals,
-                const size_t numElems)
-{
+                const size_t numElems) {
+
     int threadId = threadIdx.x;
 
     extern __shared__ unsigned int shdata_min[];
@@ -59,9 +59,11 @@ void reduce_min2(const unsigned int* d_in,
 // Assumes numElems is a power of 2 and is less than 1024
 void get_minimum2(const unsigned int* d_in,
                   const size_t numElems,
-                  unsigned int* d_vals)
-{
+                  unsigned int* d_vals) {
+    
     reduce_min2<<<1, numElems, numElems*sizeof(unsigned int)>>>(d_in, d_vals, numElems);
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 }
 
 

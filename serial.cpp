@@ -13,19 +13,23 @@
 // Input:  root - the root of a 2-tree
 // Output: Code[0:n-1] - array of binary strings, where Code[i] is the code for the symbol ai
 void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
-    if (!root->get_left_child())
-    {
+    
+    if (!root->get_left_child()) {
+    
         code[root->symbol_index] = root->get_value();
         length[root->symbol_index] = root->length;
-    }
-    else
-    {
+    
+    } else {
+        
         Node *left = root->get_left_child();
         Node *right = root->get_right_child();
+        
         left->set_value(root->get_value() & ~(1 << (root->length)));
         right->set_value(root->get_value() | (1 << (root->length)));
+        
         left->length = root->length + 1;
         right->length = root->length + 1;
+        
         generate_code(left, code, length);
         generate_code(right, code, length);
     }
@@ -36,7 +40,9 @@ void generate_code(Node *root, unsigned int code[], unsigned int length[]) {
 // Input:  a[], representing an alphabet, where a[i] == ai,
 //         Freq[0:n-1] - an array of non-negative frequencies, where Freq[i] == fi
 // Output: Code[0:n-1] - an array of binary strings for Huffman code, where Code[i] is the binary string encoding symbol ai, i=0,...,n-1
-void huffman_code(Node* &root, unsigned char a[], unsigned int freq[], unsigned int code[], unsigned int lengths[], unsigned int numVals) {
+void huffman_code(Node* &root, unsigned char a[], unsigned int freq[], unsigned int code[],
+        unsigned int lengths[], unsigned int numVals) {
+    
     std::priority_queue<Node*, std::vector<Node*>, NodeGreater> q;
 
     // init leaf nodes
@@ -50,6 +56,7 @@ void huffman_code(Node* &root, unsigned char a[], unsigned int freq[], unsigned 
     }
 
     while (q.size() > 1) {
+        
         // remove smallest and second smallest frequencies from the queue
         Node *l = q.top();
         q.pop();
@@ -67,7 +74,7 @@ void huffman_code(Node* &root, unsigned char a[], unsigned int freq[], unsigned 
 
         // insert the subtree into the heap
         q.push(subtree);
-      }
+    }
 
     if (q.size() != 0) {
         root = q.top();
@@ -82,23 +89,26 @@ void compress_data(unsigned char* original_data, unsigned char* compressed_data,
 
     const unsigned int BITS_PER_BYTE = 8;
 
-    for (int i = 0; i < num_bytes; i++)
-    {
+    for (int i = 0; i < num_bytes; i++) {
+        
         unsigned int code = codes[original_data[i]];
+        
         for (unsigned int j = 0; j < lengths[original_data[i]]; j++) {
+        
             if ((code & (1 << j)) == (1 << j)) {
                 compressed_data[byte_offset] |= (1 << bit_offset);
             } else {
                 compressed_data[byte_offset] &= ~(1 << bit_offset);
             }
+
             bit_offset = (bit_offset - 1) % BITS_PER_BYTE;
             if (bit_offset == 7) byte_offset++;
         }
     }
 }
 
-void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename)
-{
+void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename) {
+    
     const unsigned int NUM_VALS = 256;
     unsigned int frequencies[NUM_VALS];
 
@@ -170,8 +180,8 @@ void serial_huffman_encode(unsigned char* data, unsigned int num_bytes, std::str
 }
 
 void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
-                 unsigned char* decompressed_data, unsigned int decompressed_length, Node* root)
-{
+                 unsigned char* decompressed_data, unsigned int decompressed_length, Node* root) {
+    
     const int BITS_PER_BYTE = 8;
 
     unsigned int byte_offset = 0;
@@ -183,6 +193,7 @@ void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
     Node* current = root;
 
     while (decompressed_offset < decompressed_length) {
+    
         go_right = ((compressed_data[byte_offset] & (1 << (bit_offset))) == (1 << (bit_offset)));
 
         if (go_right) {
@@ -201,8 +212,8 @@ void decode_data(unsigned char* compressed_data, unsigned int compressed_length,
     }
 }
 
-void serial_huffman_decode(std::ifstream& ifs, std::string filename)
-{
+void serial_huffman_decode(std::ifstream& ifs, std::string filename) {
+    
     Node* root;
     deserialize_tree(root, ifs);
 
@@ -240,5 +251,6 @@ void serial_huffman_decode(std::ifstream& ifs, std::string filename)
     delete[] compressed_data;
     delete[] decompressed_data;
 //    delete[] bwt_data;
+
 }
 

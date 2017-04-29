@@ -1,16 +1,22 @@
 #include "main.h"
 #include "node.h"
 
+#include <stdio.h>
+
 __global__
 void decompress(unsigned char* d_compressed_data,
                 NodeArray* d_huffman_tree,
                 unsigned int* d_block_offsets,
                 unsigned char* d_decompressed_data,
-                size_t num_bytes)
-{
+                size_t num_bytes) {
+
     const unsigned int BITS_PER_BYTE = 8;
 
     unsigned int id = blockIdx.x * blockDim.x;
+
+    if ((id + threadIdx.x) > (ceilf(num_bytes/(DATA_BLOCK_SIZE/blockDim.x)))) {
+        return;
+    }
 
     unsigned int block_offset = d_block_offsets[id + threadIdx.x];
     unsigned int byte_offset = block_offset / BITS_PER_BYTE;
@@ -22,6 +28,7 @@ void decompress(unsigned char* d_compressed_data,
     unsigned int index;
 
     while ((i < (DATA_BLOCK_SIZE/(blockDim.x))) && ((id + i) < num_bytes)) {
+    
         go_right = ((d_compressed_data[byte_offset] & (1 << (bit_offset))) == (1 << (bit_offset)));
 
         if (go_right) {
@@ -47,9 +54,11 @@ void decompress_data(unsigned char* d_compressed_data,
                 NodeArray* d_huffman_tree,
                 unsigned int* d_block_offsets,
                 unsigned char* d_decompressed_data,
-                unsigned int num_bytes)
-{
+                unsigned int num_bytes) {
+
     int numBlocks = ceil(((float)num_bytes)/DATA_BLOCK_SIZE);   
     decompress<<<numBlocks, 256>>>(d_compressed_data, d_huffman_tree, d_block_offsets, d_decompressed_data, num_bytes);
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 }
 

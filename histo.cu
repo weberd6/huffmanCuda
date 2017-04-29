@@ -5,8 +5,8 @@ void updateHisto(unsigned int* d_in,
                  unsigned int val1,
                  unsigned int val2,
                  unsigned int* d_indices,
-                 const size_t numElems)
-{
+                 const size_t numElems) {
+
     int i = threadIdx.x + blockDim.x * blockIdx.x;
 
     extern __shared__ int found[];
@@ -32,8 +32,7 @@ void updateHisto(unsigned int* d_in,
 __global__
 void markZeroBins(unsigned int* d_in,
                   unsigned int* d_count,
-                  const size_t numElems)
-{
+                  const size_t numElems) {
     int i = threadIdx.x + blockDim.x * blockIdx.x;
 
     if ((i < numElems) && (0 == d_in[i])) {
@@ -45,8 +44,7 @@ void markZeroBins(unsigned int* d_in,
 __global__
 void histo(const unsigned char* const vals, //INPUT
            unsigned int* const histo,      //OUPUT
-           int numVals)
-{
+           int numVals) {
     extern __shared__ unsigned int s_histo[];
     int pos = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -68,28 +66,33 @@ void update_histo_and_get_min_indices(unsigned int* d_in,
                                       unsigned int val1,
                                       unsigned int val2,
                                       unsigned int* d_indices,
-                                      const size_t numElems)
-{
+                                      const size_t numElems) {
+
     updateHisto<<<1, numElems, 2*sizeof(unsigned int)>>>(d_in, val1, val2, d_indices, numElems);
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 }
 
 void minimizeBins(unsigned int* d_in,
                   unsigned int* d_count,
-                  const size_t numElems)
-{
+                  const size_t numElems) {
     markZeroBins<<<1, numElems>>>(d_in, d_count, numElems);
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 }
 
 void computeHistogram(const unsigned char* const d_vals, //INPUT
                       unsigned int* const d_histo,      //OUTPUT
                       const unsigned int numBins,
-                      const unsigned int numElems)
-{
+                      const unsigned int numElems) {
+
     const int threadsPerBlock = 256;
     int numBlocks = ceil(((float)numElems)/threadsPerBlock);
+
     histo<<<numBlocks, threadsPerBlock, threadsPerBlock*sizeof(unsigned int)>>>
         (d_vals, d_histo, numElems);
 
-    cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
 }
 

@@ -5,9 +5,10 @@
 #include "main.h"
 #include "node.h"
 
-void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename)
-{
+void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::string filename) {
+
     const unsigned int NUM_VALS = 256;
+    const unsigned int PADDING = ((num_bytes % 256) == 0) ? 0 : (256 - (num_bytes % 256));
     double duration;
 
     unsigned char* d_vals;
@@ -32,8 +33,12 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMalloc(&d_min_indices, 2*sizeof(unsigned int));
     cudaMalloc(&d_codes, NUM_VALS*sizeof(unsigned int));
     cudaMalloc(&d_lengths, NUM_VALS*sizeof(unsigned int));
-    cudaMalloc(&d_data_lengths, num_bytes*sizeof(unsigned int));
-    cudaMalloc(&d_lengths_partial_sums, num_bytes*sizeof(unsigned int));
+
+    cudaMalloc(&d_data_lengths, (num_bytes+PADDING)*sizeof(unsigned int));
+    cudaMemset(d_data_lengths, 0, (num_bytes+PADDING)*sizeof(unsigned int));
+    
+    cudaMalloc(&d_lengths_partial_sums, (num_bytes+PADDING)*sizeof(unsigned int));
+    cudaMemset(d_lengths_partial_sums, 0, (num_bytes+PADDING)*sizeof(unsigned int));
 
     duration = ( std::clock() - malloc_start ) / (double) CLOCKS_PER_SEC;
     std::cout << "Malloc time: " << duration*1000 << " ms" << std::endl;
@@ -41,7 +46,10 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     std::clock_t histogram_start = std::clock();
 
     cudaMemcpy(d_vals, data, num_bytes*sizeof(unsigned char), cudaMemcpyHostToDevice);
+    checkCudaErrors(cudaGetLastError());
+ 
     cudaMemset(d_frequencies, 0, NUM_VALS*sizeof(unsigned int));
+    checkCudaErrors(cudaGetLastError());
 
     computeHistogram(d_vals, d_frequencies, NUM_VALS, num_bytes);
     duration = ( std::clock() - histogram_start ) / (double) CLOCKS_PER_SEC;
@@ -53,6 +61,7 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     unsigned int* d_count;
     cudaMalloc(&d_count, sizeof(unsigned int));
     cudaMemcpy(d_count, &count, sizeof(count), cudaMemcpyHostToDevice);
+
     minimizeBins(d_frequencies, d_count, NUM_VALS);
     cudaMemcpy(&count, d_count, sizeof(count), cudaMemcpyDeviceToHost);
 
@@ -63,7 +72,9 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     Node* node_by_index[NUM_VALS];
 
     for (int i = 0; i < NUM_VALS; i++) {
+     
         if (h_frequencies[i] != 0xFFFFFFFF) sum += h_frequencies[i];
+        
         leaf_nodes[i].frequency = h_frequencies[i];
         leaf_nodes[i].symbol_index = i;
         node_by_index[i] = &leaf_nodes[i];
@@ -72,7 +83,9 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     Node* root;
     Node* l;
     Node* r;
+   
     while (count > 1) {
+ 
         get_minimum2(d_frequencies, NUM_VALS, d_min_frequencies);
         cudaMemcpy(h_min_frequencies, d_min_frequencies, 2*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
@@ -109,8 +122,9 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaMalloc(&d_compressed_data, compressed_num_bytes*sizeof(unsigned char*));
 
     unsigned int* d_block_offsets;
-    unsigned int num_blocks = ceil(num_bytes/(DATA_BLOCK_SIZE/256.0));
+    unsigned int num_blocks = ceil((float)num_bytes/(DATA_BLOCK_SIZE/256.0));
     cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
+    std::cout << "Num blocks: " << num_blocks << std::endl;
 
     compress_data(d_vals, d_codes, d_lengths, d_lengths_partial_sums, d_block_offsets, d_compressed_data, num_bytes);
     duration = ( std::clock() - compression_start ) / (double) CLOCKS_PER_SEC;
@@ -151,8 +165,8 @@ void parallel_huffman_encode(unsigned char* data, unsigned int num_bytes, std::s
     cudaFree(d_compressed_data);
 }
 
-void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
-{ 
+void parallel_huffman_decode(std::ifstream& ifs, std::string filename) {
+
     unsigned int* d_block_offsets;
     unsigned char* d_compressed_data;
 
@@ -167,13 +181,15 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     unsigned int compressed_length;
     ifs.read(reinterpret_cast<char*>(&compressed_length), sizeof(compressed_length));
 
-    unsigned int num_blocks = ceil(decompressed_length/(DATA_BLOCK_SIZE/256.0));
+    unsigned int num_blocks = ceil((float)decompressed_length/(DATA_BLOCK_SIZE/256.0));
+
+    std::cout << "Num blocks: " << num_blocks << std::endl;
 
     cudaMalloc(&d_block_offsets, num_blocks*sizeof(unsigned int));
     unsigned int* h_block_offsets = new unsigned int[num_blocks];
     ifs.read(reinterpret_cast<char*>(h_block_offsets), num_blocks*sizeof(unsigned int));
     cudaMemcpy(d_block_offsets, h_block_offsets, num_blocks*sizeof(unsigned int), cudaMemcpyHostToDevice);
-
+ 
     cudaMalloc(&d_compressed_data, compressed_length*sizeof(unsigned char));
     unsigned char* h_compressed_data = new unsigned char[compressed_length];
     ifs.read(reinterpret_cast<char*>(h_compressed_data), compressed_length*sizeof(unsigned char));
@@ -183,7 +199,7 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     //  so that a entire tree can be linearized.
     // NOTE: Not all array elemements will be used unless the tree is perfect. (Which won't be the case)
     // NOTE: This is just a guess FIXME
-    unsigned int array_size = 1 << 17;
+    unsigned int array_size = 1 << 18;
 
     std::clock_t decompression_start = std::clock();
 
@@ -208,6 +224,7 @@ void parallel_huffman_decode(std::ifstream& ifs, std::string filename)
     std::ofstream ofs(output_filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 
     unsigned char* h_decompressed_data = new unsigned char[decompressed_length];
+  
     cudaMemcpy(h_decompressed_data, d_decompressed_data, decompressed_length*sizeof(unsigned char),  cudaMemcpyDeviceToHost);
 
 //    h_decompressed_data[decompressed_length-1] = '\n';

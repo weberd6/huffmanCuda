@@ -6,8 +6,7 @@
 
 #include "main.h"
 
-int main (int argc, char** argv)
-{
+int main (int argc, char** argv) {
 
     bool parallel = false;
     bool encode = true;
@@ -49,6 +48,7 @@ int main (int argc, char** argv)
     }
 
     if (encode) {
+        
         long num_bytes = getFileSize(input_filename);
         char* data = new char[num_bytes];
         ifs.read(data, num_bytes);
@@ -64,7 +64,9 @@ int main (int argc, char** argv)
 
         duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
         std::cout << "Total time: " << duration*1000 << " ms" << std::endl;
+    
     } else {
+ 
         std::clock_t start = std::clock();
         double duration;
 
@@ -82,5 +84,4 @@ int main (int argc, char** argv)
 
     return 0;
 }
-
 
